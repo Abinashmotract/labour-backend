@@ -1,211 +1,246 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 const ServiceSchema = require("../models/stylistServices");
 
 // models/StylistProfile.js
-const StylistSchema = new mongoose.Schema({
+const StylistSchema = new mongoose.Schema(
+  {
     fullName: {
-        type: String,
-        required: false
+      type: String,
+      required: false,
     },
     bio: {
-        type: String
+      type: String,
     },
     email: {
-        type: String,
-        required: false,
-        unique: true,
-        lowercase: true
+      type: String,
+      required: false,
+      unique: true,
+      lowercase: true,
     },
-    isAge18: {
-        type: Boolean
-    },
+    dob: { type: Date },
     address: {
-        street: String,
-        house: String,
-        city: String,
-        province: String,
-        zipCode: Number,
-        country: String
+      street: String,
+      house: String,
+      city: String,
+      province: String,
+      zipCode: Number,
+      country: String,
     },
     phoneNumber: {
-        type: Number,
-        required: false,
-        // unique: true,
+      type: Number,
+      required: false,
+      // unique: true,
     },
     password: {
-        type: String,
-        required: false,
+      type: String,
+      required: false,
     },
-    role: { type: String, enum: ["user", "stylist", "admin"], default: "stylist" },
+    role: {
+      type: String,
+      enum: ["user", "stylist", "admin"],
+      default: "stylist",
+    },
     deviceToken: {
-        type: String,
+      type: String,
     },
     refreshToken: {
-        type: String
+      type: String,
     },
     otp: {
-        type: String,
+      type: String,
     },
     otpExpiration: {
-        type: Date,
+      type: Date,
     },
     lastOtpRequest: Date,
     isApproved: {
-        type: Boolean,
-        default: false
+      type: Boolean,
+      default: false,
     },
     profilePicture: {
-        type: String,
+      type: String,
     },
-    photos: [{
+    photos: [
+      {
         url: { type: String, required: true },
         name: { type: String },
         uploadedAt: { type: Date, default: Date.now },
         verified: { type: Boolean, default: false },
         metadata: {
-            size: Number,
-            fileType: String
-        }
-    }],
+          size: Number,
+          fileType: String,
+        },
+      },
+    ],
     socialMediaLinks: {
-        facebook: {
-            type: String
-        },
-        instagram: {
-            type: String
-        },
-        linkedin: {
-            type: String
-        }
+      facebook: {
+        type: String,
+      },
+      instagram: {
+        type: String,
+      },
+      linkedin: {
+        type: String,
+      },
     },
     profileCompletionStep: {
-        type: String,
-        enum: ["personalInfo", "serviceLocation", "portfolio", "services", "availability", "specialities", "certifications","completed"]
+      type: String,
+      enum: [
+        "personalInfo",
+        "serviceLocation",
+        "portfolio",
+        "services",
+        "availability",
+        "specialities",
+        "certifications",
+        "completed",
+      ],
     },
-    services: [{
+    services: [
+      {
         serviceId: {
-            type: Schema.Types.ObjectId,
-            ref: "StylistService"
+          type: Schema.Types.ObjectId,
+          ref: "StylistService",
         },
         subService: {
-            type: Schema.Types.ObjectId,
+          type: Schema.Types.ObjectId,
         },
         price: Number,
-        duration: String
-    }],
+        duration: String,
+      },
+    ],
     serviceLocation: {
-        type: {
-            type: String,
-            enum: ["customer_place", "boc_location", "own_salon"],
-            required: false
-        },
-        ownSalonDetails: {
-            isPrivateParkingAvailable: { type: Boolean, default: false },
-            isBusStopNearby: { type: Boolean, default: false }
-        }
+      type: {
+        type: String,
+        enum: ["customer_place", "boc_location", "own_salon"],
+        required: false,
+      },
+      ownSalonDetails: {
+        isPrivateParkingAvailable: { type: Boolean, default: false },
+        isBusStopNearby: { type: Boolean, default: false },
+      },
     },
-    gender: { type: String, enum: ["male", "female", "others"], default: "male" },
+    gender: {
+      type: String,
+      enum: ["male", "female", "others"],
+      default: "male",
+    },
     location: {
-        category: {
-            type: String,
-            enum: ["customer", "boc", "own"]
+      category: {
+        type: String,
+        enum: ["customer", "boc", "own"],
+      },
+      details: {
+        parking: {
+          type: Boolean,
         },
-        details: {
-            parking: {
-                type: Boolean
-            },
-            busStop: {
-                type: Boolean
-            }
+        busStop: {
+          type: Boolean,
         },
-        type: {
-            type: String,
-            enum: ["Point"],
-            default: "Point",
+      },
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        default: [0, 0],
+        validate: {
+          validator: function (v) {
+            return (
+              v.length === 2 && Math.abs(v[0]) <= 180 && Math.abs(v[1]) <= 90
+            );
+          },
+          message: "Invalid GeoJSON coordinates",
         },
-        coordinates: {
-            type: [Number], // [longitude, latitude]
-            default: [0, 0],
-            validate: {
-                validator: function (v) {
-                    return v.length === 2 &&
-                        Math.abs(v[0]) <= 180 &&
-                        Math.abs(v[1]) <= 90;
-                },
-                message: "Invalid GeoJSON coordinates"
-            },
-            lastUpdated: {
-                type: Date,
-                default: null
-            }
+        lastUpdated: {
+          type: Date,
+          default: null,
         },
+      },
     },
     specialities: [String],
     expertise: [String],
-    experience: [{
+    experience: [
+      {
         salon: String,
         role: String,
-        duration: String
-    }],
-    certificates: [{
+        duration: String,
+      },
+    ],
+    certificates: [
+      {
         url: String,
-        verified: { type: Boolean, default: false }
-    }],
-    portfolio: [{
+        verified: { type: Boolean, default: false },
+      },
+    ],
+    portfolio: [
+      {
         url: String,
-    }],
+      },
+    ],
     isProfileCompleted: {
-        type: Boolean
+      type: Boolean,
     },
     about: {
-        shopName: {
-            type: String,
-            maxlength: 50
+      shopName: {
+        type: String,
+        maxlength: 50,
+      },
+      startFrom: {
+        type: Number,
+      },
+      about: {
+        type: String,
+        maxlength: 1000,
+      },
+      address: {
+        type: String,
+        maxlength: 200,
+      },
+      schedule: {
+        type: String,
+        enum: ["Mon-Fri", "Mon-Sat", "Daily", "Custom"],
+        default: "Mon-Sat",
+      },
+      customDays: {
+        type: String,
+        enum: [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday",
+        ],
+      },
+      timings: {
+        from: {
+          type: String,
+          match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
         },
-        startFrom: {
-            type: Number,
-        },
-        about: {
-            type: String,
-            maxlength: 1000
-        },
-        address: {
-            type: String,
-            maxlength: 200
-        },
-        schedule: {
-            type: String,
-            enum: ['Mon-Fri', 'Mon-Sat', 'Daily', 'Custom'],
-            default: 'Mon-Sat'
-        },
-        customDays: {
-            type: String,
-            enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        },
-        timings: {
-            from: {
-                type: String,
-                match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
+        till: {
+          type: String,
+          match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
+          validate: {
+            validator: function (till) {
+              return !this.timings?.from || till > this.timings.from;
             },
-            till: {
-                type: String,
-                match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
-                validate: {
-                    validator: function (till) {
-                        return !this.timings?.from || till > this.timings.from;
-                    },
-                    message: 'Closing time must be after opening time'
-                }
-            }
+            message: "Closing time must be after opening time",
+          },
         },
-        currentStatus: {
-            type: Boolean
-        }
-    }
+      },
+      currentStatus: {
+        type: Boolean,
+      },
+    },
+  },
+  { timestamps: true }
+);
 
-}, { timestamps: true });
+StylistSchema.index({ location: "2dsphere" });
 
-StylistSchema.index({ location: '2dsphere' });
-
-module.exports = mongoose.model('Stylist', StylistSchema);
+module.exports = mongoose.model("Stylist", StylistSchema);

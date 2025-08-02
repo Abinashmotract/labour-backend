@@ -36,35 +36,6 @@ const getAllUsers = async (req, res) => {
     }
 };
 
-// const verifyUserProfile = async (req, res) => {
-//     try {
-//         const { id } = req.params;
-//         const user = await User.findById(id);
-//         if (!user) {
-//             return res.status(404).json({
-//                 success: false,
-//                 status: 404,
-//                 message: "User not found!",
-//             });
-//         }
-//         user.isPhoneVerified = !user.isPhoneVerified;
-//         await user.save();
-//         return res.status(200).json({
-//             success: true,
-//             status: 200,
-//             message: `User ${user.isPhoneVerified ? "verified" : "unverified"} successfully.`,
-//             isPhoneVerified: user.isPhoneVerified,
-//         });
-
-//     } catch (error) {
-//         return res.status(500).json({
-//             success: false,
-//             status: 500,
-//             message: error.message,
-//         });
-//     }
-// };
-
 const updateUserDetails = async (req, res) => {
     try {
         const { userId, ...rest } = req.body;
@@ -104,51 +75,10 @@ const updateUserDetails = async (req, res) => {
     }
 };
 
-// const getAllUsers = async (req, res) => {
-//     try {
-//         const { role } = req.query;
-//         const users = await User.find({ role: role });
-//         if (users) {
-//             return res.status(200).json({
-//             success: true,
-//             status: 200,
-//             message: "Successfully fetched users!",
-//             data: users
-//         });
-//         }
-
-//         // const stylist = await User.find({ role: role });
-//         // if (stylist) {
-//         //     return res.status(200).json({
-//         //         success: true,
-//         //         status: 200,
-//         //         message: "Successfully fetched stylists!",
-//         //         data: users
-//         //     });
-//         // }
-
-//         res.status(404).json({
-//             success: false,
-//             status: 404,
-//             message: "No Users found!",
-//             data: users
-//         });
-//     }
-//     catch (error) {
-//         return res.status(500).json({
-//             success: false,
-//             status: 500,
-//             message: error.message
-//         });
-//     }
-// };
-
 // get user by id
-
 const getUserById = async (req, res) => {
     try {
         const { id } = req.params;
-
         const user = await User.findById(id)
             .select("-password -refreshToken -favorites -otp -otpAttempts -otpFailedAttempts -lastOtpRequest");
         if (!user) {
@@ -158,14 +88,12 @@ const getUserById = async (req, res) => {
                 message: "User not found!"
             });
         }
-
         res.status(200).json({
             success: true,
             status: 200,
             message: "User fetched successfully!",
             data: user
         })
-
     }
     catch (error) {
         return res.status(500).json({

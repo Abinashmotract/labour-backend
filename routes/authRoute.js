@@ -7,7 +7,7 @@ const {
     login,
     sendOTP,
     verifyMobileOTP,
-    stylistSignup,
+    contracterSignUp,
     stylistLogout
 } = require('../controllers/authController');
 // const { verifyUser, verifyAdmin } = require("../middleware/verifyToken");
@@ -30,7 +30,7 @@ const otpRateLimiter = rateLimit({
 const router = express.Router();
 
 router.post('/user/signup', userSignup);
-router.post('/stylist/signup', stylistSignup);
+router.post('/stylist/signup', contracterSignUp);
 router.post('/send-email', otpRateLimiter, sendEmail);
 router.post('/verify-otp', verifyOTP);
 router.post('/reset-password', resetPassword);
