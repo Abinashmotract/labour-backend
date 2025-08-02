@@ -29,8 +29,8 @@ const otpRateLimiter = rateLimit({
 
 const router = express.Router();
 
-router.post('/user/signup', userSignup);
-router.post('/stylist/signup', contracterSignUp);
+router.post('/labour/signup', userSignup);
+router.post('/contracter/signup', contracterSignUp);
 router.post('/send-email', otpRateLimiter, sendEmail);
 router.post('/verify-otp', verifyOTP);
 router.post('/reset-password', resetPassword);
