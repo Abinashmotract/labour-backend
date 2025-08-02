@@ -41,7 +41,7 @@ app.use(
 // Middleware setup
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://54.205.149.77:2233"],
+    origin: ["http://localhost:5173", "https://labour-backend-pvja.onrender.com"],
     // origin: "http://localhost:3001", // Frontend origin
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
