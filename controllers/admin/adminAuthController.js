@@ -20,8 +20,8 @@ const loginAdmin = async (req, res, next) => {
             return next(createError(400, 'Email and password are required'));
         }
 
-        const adminEmail = 'bocadmin@gmail.com';
-        const hashedAdminPassword = await bcrypt.hash('bocAdmin123', 10);
+        const adminEmail = 'labour@gmail.com';
+        const hashedAdminPassword = await bcrypt.hash('labourAdmin123', 10);
 
         if (email !== adminEmail) {
             return res.status(401).json({

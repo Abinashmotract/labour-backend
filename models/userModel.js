@@ -28,7 +28,7 @@ const UserSchema = mongoose.Schema(
     addressLine2: { type: String, required: false },
     city: { type: String, required: false },
     region: { type: String, required: false },
-    postalCode: { type: Number, required: false },
+    postalCode: { type: String, required: false },
     password: {
       type: String,
       required: false,

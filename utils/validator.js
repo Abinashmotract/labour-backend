@@ -58,11 +58,6 @@ const validatePostalCode = (postalCode) => {
     if (!/^[A-Za-z0-9]+$/.test(cleanCode)) {
         throw new Error('Postal code can only contain letters and numbers');
     }
-
-    // Country-specific validation (example for US ZIP codes)
-    // if (!/^\d{5}(-\d{4})?$/.test(cleanCode)) {
-    //   throw new Error('Invalid US ZIP code format');
-    // }
 };
 
 const validatePhoneNumber = (phoneNumber) => {

@@ -14,9 +14,20 @@ const { validateEmail, validatePassword, validatePhoneNumber, validateName, vali
 // user signup
 const userSignup = async (req, res) => {
   try {
-    const { fullName, email, age, phoneNumber, city, region, postalCode, password, addressLine1, addressLine2 } = req.body
+    const {
+      fullName,
+      email,
+      age,
+      phoneNumber,
+      city,
+      region,
+      password,
+      addressLine1,
+      addressLine2
+    } = req.body;
 
-    // Validate inputs
+    const postalCode = req.body.postalCode?.toString().trim();  // Convert to string safely
+
     validateEmail(email);
     validatePassword(password);
     validatePhoneNumber(phoneNumber);
@@ -82,7 +93,7 @@ const userSignup = async (req, res) => {
 };
 
 // controllers/stylistController.js
-const stylistSignup = async (req, res) => {
+const contracterSignUp = async (req, res) => {
   try {
     const {
       fullName, email, dob, phoneNumber, password
@@ -91,7 +102,7 @@ const stylistSignup = async (req, res) => {
     // Validate inputs
     validateEmail(email);
     validatePassword(password);
-    validatePhoneNumber(phoneNumber);
+    validatePhoneNumber(phoneNumber);           
     validateName(fullName);
 
     const [existingUser, existingStylist] = await Promise.all([
@@ -117,7 +128,7 @@ const stylistSignup = async (req, res) => {
     const stylist = await Stylist.create({
       fullName,
       email: email.toLowerCase(),
-      isAge18: dob,
+      dob: new Date(dob),
       phoneNumber,
       password: hashedPassword,
       role: 'stylist',
@@ -130,7 +141,7 @@ const stylistSignup = async (req, res) => {
     res.status(201).json({
       success: true,
       status: 201,
-      message: "Stylist created successfully!",
+      message: "Contracter created successfully!",
       data: responseData
     });
   } catch (error) {
@@ -451,7 +462,6 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-
 //  mobile OTP setup apis
 const sendOTP = async (req, res) => {
   const { phoneNumber } = req.body;
@@ -511,6 +521,6 @@ module.exports = {
   login,
   sendOTP,
   verifyMobileOTP,
-  stylistSignup,
+  contracterSignUp,
   stylistLogout
 }
