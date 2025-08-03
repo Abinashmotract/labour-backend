@@ -4,7 +4,7 @@ const createError = require('../../middleware/error');
 // Get all contractors
 const getAllContractors = async (req, res) => {
     try {
-        const { page = 1, limit = 10, status, search } = req.query;
+        const { page = 1, limit = 10, status, search, activeStatus } = req.query;
         
         let query = {};
         
@@ -12,6 +12,13 @@ const getAllContractors = async (req, res) => {
         if (status === 'approved') {
             query.isApproved = true;
         } else if (status === 'pending') {
+            query.isApproved = false;
+        }
+        
+        // Filter by approval status
+        if (activeStatus === 'active') {
+            query.isApproved = true;
+        } else if (activeStatus === 'inactive') {
             query.isApproved = false;
         }
         
@@ -45,6 +52,40 @@ const getAllContractors = async (req, res) => {
         });
     } catch (error) {
         console.error("Error in getAllContractors:", error);
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: "Internal Server Error"
+        });
+    }
+};
+
+// Get all contractors (simple version without pagination)
+const getAllContractorsSimple = async (req, res) => {
+    try {
+        const { activeStatus } = req.query;
+        
+        let query = {};
+        
+        // Filter by approval status
+        if (activeStatus === 'active') {
+            query.isApproved = true;
+        } else if (activeStatus === 'inactive') {
+            query.isApproved = false;
+        }
+        
+        const contractors = await Contracter.find(query)
+            .select('-password -refreshToken -otp -otpExpiration -lastOtpRequest')
+            .sort({ createdAt: -1 });
+            
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "All contractors fetched successfully!",
+            data: contractors
+        });
+    } catch (error) {
+        console.error("Error in getAllContractorsSimple:", error);
         return res.status(500).json({
             success: false,
             status: 500,
@@ -197,6 +238,8 @@ const getContractorStats = async (req, res) => {
         const totalContractors = await Contracter.countDocuments();
         const approvedContractors = await Contracter.countDocuments({ isApproved: true });
         const pendingContractors = await Contracter.countDocuments({ isApproved: false });
+        const activeContractors = await Contracter.countDocuments({ isApproved: true });
+        const inactiveContractors = await Contracter.countDocuments({ isApproved: false });
         
         // Get contractors by work category
         const contractorsByCategory = await Contracter.aggregate([
@@ -219,6 +262,8 @@ const getContractorStats = async (req, res) => {
                 totalContractors,
                 approvedContractors,
                 pendingContractors,
+                activeContractors,
+                inactiveContractors,
                 contractorsByCategory
             }
         });
@@ -232,11 +277,164 @@ const getContractorStats = async (req, res) => {
     }
 };
 
+// Activate contractor
+const activateContractor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const contractor = await Contracter.findById(id);
+        if (!contractor) {
+            return res.status(404).json({
+                success: false,
+                status: 404,
+                message: "Contractor not found!"
+            });
+        }
+        
+        if (contractor.isApproved) {
+            return res.status(400).json({
+                success: false,
+                status: 400,
+                message: "Contractor is already approved!"
+            });
+        }
+        
+        contractor.isApproved = true;
+        await contractor.save();
+        
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Contractor approved successfully!",
+            data: {
+                id: contractor._id,
+                fullName: contractor.fullName,
+                email: contractor.email,
+                isApproved: contractor.isApproved
+            }
+        });
+    } catch (error) {
+        console.error("Error in activateContractor:", error);
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: "Internal Server Error"
+        });
+    }
+};
+
+// Deactivate contractor
+const deactivateContractor = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        const contractor = await Contracter.findById(id);
+        if (!contractor) {
+            return res.status(404).json({
+                success: false,
+                status: 404,
+                message: "Contractor not found!"
+            });
+        }
+        
+        if (!contractor.isApproved) {
+            return res.status(400).json({
+                success: false,
+                status: 400,
+                message: "Contractor is already disapproved!"
+            });
+        }
+        
+        contractor.isApproved = false;
+        await contractor.save();
+        
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Contractor disapproved successfully!",
+            data: {
+                id: contractor._id,
+                fullName: contractor.fullName,
+                email: contractor.email,
+                isApproved: contractor.isApproved
+            }
+        });
+    } catch (error) {
+        console.error("Error in deactivateContractor:", error);
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: "Internal Server Error"
+        });
+    }
+};
+
+// Update contractor status (for frontend compatibility)
+const updateContractorStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { isApproved } = req.body;
+        
+        // Validate the request body
+        if (typeof isApproved !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                status: 400,
+                message: "isApproved must be a boolean value"
+            });
+        }
+        
+        const contractor = await Contracter.findById(id);
+        if (!contractor) {
+            return res.status(404).json({
+                success: false,
+                status: 404,
+                message: "Contractor not found!"
+            });
+        }
+        
+        // Update the isApproved status based on isApproved
+        contractor.isApproved = isApproved;
+        
+        // Use findByIdAndUpdate instead of save() to avoid validation issues
+        const updatedContractor = await Contracter.findByIdAndUpdate(
+            id,
+            { isApproved: isApproved },
+            { new: true, runValidators: false }
+        );
+        
+        const statusMessage = updatedContractor.isApproved ? "approved" : "disapproved";
+        
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: `Contractor ${statusMessage} successfully!`,
+            data: {
+                id: updatedContractor._id,
+                fullName: updatedContractor.fullName,
+                email: updatedContractor.email,
+                isApproved: updatedContractor.isApproved
+            }
+        });
+    } catch (error) {
+        console.error("Error in updateContractorStatus:", error);
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: "Internal Server Error"
+        });
+    }
+};
+
 module.exports = {
     getAllContractors,
+    getAllContractorsSimple,
     getContractorById,
     updateContractorApproval,
     deleteContractor,
     deleteMultipleContractors,
-    getContractorStats
+    getContractorStats,
+    activateContractor,
+    deactivateContractor,
+    updateContractorStatus
 }; 

@@ -131,7 +131,7 @@ const contracterSignUp = async (req, res) => {
       memoryCost: 65536,
       timeCost: 3,
       parallelism: 1,
-    });
+    });qqq
 
     // ✅ Create contracter
     const contracter = await Contracter.create({

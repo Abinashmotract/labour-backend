@@ -6,7 +6,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "migrate:add-isactive": "node migrations/addIsActiveToContractors.js",
+    "migrate:isactive-to-isapproved": "node migrate-isactive-to-isapproved.js"
   },
   "keywords": [],
   "author": "",

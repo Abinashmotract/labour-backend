@@ -47,6 +47,10 @@ const contracterSchema = new mongoose.Schema(
             enum: ["labour", "contractor", "admin"],
             default: "contractor",
         },
+        isApproved: {
+            type: Boolean,
+            default: true,
+        },
         profileCompletionStep: {
             type: String,
             default: "personalInfo",

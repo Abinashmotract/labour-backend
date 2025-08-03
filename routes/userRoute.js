@@ -9,6 +9,7 @@ const {
     deleteMultipleUsers,
     uploadProfileImage,
     updateUserDetails,
+    getContractorById,
     // verifyUserProfile
 } = require('../controllers/userController');
 const { verifyUser, verifyAdmin, verifyAllToken } = require("../middleware/verifyToken");
@@ -17,6 +18,7 @@ const { verifyUser, verifyAdmin, verifyAllToken } = require("../middleware/verif
 const router = express.Router();
 
 router.get('/get/:id', getUserById);
+router.get('/contractor/:id', verifyAllToken(['contractor']), getContractorById);
 router.patch('/update/:id', updateUserProfile);
 router.patch('/update-location', verifyAllToken(['labour']), updateLocation);
 router.post('/profile-image', verifyAllToken(['labour']), uploadProfileImage)

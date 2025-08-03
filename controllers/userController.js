@@ -371,6 +371,52 @@ const uploadProfileImage = async (req, res) => {
     }
 };
 
+// Get contractor by ID (for contractors to view their own details)
+const getContractorById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const Contracter = require("../models/Contracter");
+        
+        // Check if user is accessing their own data or is admin
+        const userRole = req.user.role;
+        const userId = req.user.id;
+        
+        // Only allow contractors to access their own data, or admins to access any data
+        if (userRole === 'contractor' && userId !== id) {
+            return res.status(403).json({
+                success: false,
+                status: 403,
+                message: "Access denied! You can only view your own profile."
+            });
+        }
+        
+        const contractor = await Contracter.findById(id)
+            .select('-password -refreshToken -otp -otpExpiration -lastOtpRequest');
+            
+        if (!contractor) {
+            return res.status(404).json({
+                success: false,
+                status: 404,
+                message: "Contractor not found!"
+            });
+        }
+        
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "Contractor fetched successfully!",
+            data: contractor
+        });
+    } catch (error) {
+        console.error("Error in getContractorById:", error);
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: "Internal Server Error"
+        });
+    }
+};
+
 module.exports = {
     getAllUsers,
     // verifyUserProfile,
@@ -381,5 +427,6 @@ module.exports = {
     updateLocation,
     searchUsers,
     deleteMultipleUsers,
-    uploadProfileImage
+    uploadProfileImage,
+    getContractorById
 }
