@@ -282,8 +282,6 @@ const searchUsers = async (req, res) => {
     }
 };
 
-
-
 // multiple delete users
 const deleteMultipleUsers = async (req, res) => {
     try {

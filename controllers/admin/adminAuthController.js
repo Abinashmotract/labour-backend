@@ -13,14 +13,11 @@ const adminPassword = 'stylecap123';
 const loginAdmin = async (req, res, next) => {
     try {
         const { email, password } = req.body;
-
         if (!email || !password) {
             return next(createError(400, 'Email and password are required'));
         }
-
         const adminEmail = 'labour@gmail.com';
         const hashedAdminPassword = await bcrypt.hash('labourAdmin123', 10);
-
         if (email !== adminEmail) {
             return res.status(401).json({
                 message: "Authentication failed. Invalid email or password",
@@ -28,7 +25,6 @@ const loginAdmin = async (req, res, next) => {
                 success: false,
             });
         }
-
         const isPasswordCorrect = await bcrypt.compare(password, hashedAdminPassword);
         if (!isPasswordCorrect) {
             return res.status(401).json({
@@ -37,16 +33,13 @@ const loginAdmin = async (req, res, next) => {
                 success: false,
             });
         }
-
         const jwtSecret = process.env.JWT_SECRET || 'your_jwt_secret';
         const token = jwt.sign({ role: 'admin' }, jwtSecret, { expiresIn: '7d' });
-
         res.cookie('admin_token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'development',
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
-
         res.status(200).json({
             status: 200,
             success: true,
