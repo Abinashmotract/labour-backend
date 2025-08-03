@@ -56,7 +56,7 @@ const getS3Client = async () => {
 };
 
 const storage = multer.memoryStorage();
-const upload = multer({ storage }).array("files", 5);
+const upload = multer({ storage }).single("files");
 
 const uploadToS3 = async (req, res, next) => {
     upload(req, res, async (err) => {
@@ -64,30 +64,25 @@ const uploadToS3 = async (req, res, next) => {
             return res.status(400).json({ error: err.message });
         }
 
-        if (!req.files || req.files.length === 0) {
+        if (!req.file) {
             req.fileLocations = [];
             return next();
         }
+
         try {
             const { s3Client, config } = await getS3Client();
-            const fileLocations = [];
+            const fileKey = `${Date.now()}-${req.file.originalname}`;
+            const params = {
+                Bucket: config.bucketName,
+                Key: fileKey,
+                Body: req.file.buffer,
+                ContentType: req.file.mimetype,
+            };
 
-            for (const file of req.files) {
-                const fileKey = `${Date.now()}-${file.originalname}`;
-                const params = {
-                    Bucket: config.bucketName,
-                    Key: fileKey,
-                    Body: file.buffer,
-                    ContentType: file.mimetype,
-                };
+            await s3Client.putObject(params);
 
-                await s3Client.putObject(params);
-
-                const fileUrl = `https://${config.bucketName}.s3.${config.region}.amazonaws.com/${fileKey}`;
-                fileLocations.push(fileUrl);
-            }
-
-            req.fileLocations = fileLocations;
+            const fileUrl = `https://${config.bucketName}.s3.${config.region}.amazonaws.com/${fileKey}`;
+            req.fileLocations = [fileUrl]; // single file
             next();
         } catch (uploadError) {
             console.error("Upload Error:", uploadError);
@@ -95,6 +90,7 @@ const uploadToS3 = async (req, res, next) => {
         }
     });
 };
+
 
 module.exports = { uploadToS3 };
 

@@ -2,10 +2,8 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const createError = require('../../middleware/error');
 const User = require('../../models/userModel');
-const Appointment = require('../../models/appointmentModel');
-const Review = require('../../models/reviewModel');
-const Product = require('../../models/productModel');
-const Stylist = require('../../models/hairStylistModel');
+const Contracter = require('../../models/Contracter');
+
 
 // Hardcoded admin credentials for demonstration
 const adminEmail = 'stylecap@gmail.com';
@@ -99,52 +97,40 @@ const timeAgo = (date) => {
 const dashboardOverViews = async (req, res) => {
     try {
         // === Stats ===
-        const totalUsers = await User.countDocuments();
-        const activeBookings = await Appointment.countDocuments({ status: { $in: ['pending', 'confirmed'] } });
-        const completedServices = await Appointment.countDocuments({ status: 'completed' });
-        const revenue = 12400; // Placeholder
-        const pendingApprovals = await Stylist.countDocuments({ isApproved: false });
+        const totalLabour = await User.countDocuments({ role: 'labour' });
+        const totalContractors = await Contracter.countDocuments();
+        const pendingContractorApprovals = await Contracter.countDocuments({ isApproved: false });
+        const approvedContractors = await Contracter.countDocuments({ isApproved: true });
 
         // === Dynamic Recent Activity ===
         const recentActivity = [];
 
-        const [recentBookings, updatedStylists, updatedProducts] = await Promise.all([
-            Appointment.find().sort({ createdAt: -1 }).limit(3).populate("user").populate("stylist"),
-            Stylist.find().sort({ updatedAt: -1 }).limit(3),
-            Product.find().sort({ updatedAt: -1 }).limit(3),
+        const [recentLabour, recentContractors] = await Promise.all([
+            User.find({ role: 'labour' }).sort({ createdAt: -1 }).limit(3),
+            Contracter.find().sort({ createdAt: -1 }).limit(3),
         ]);
 
-        // Add Bookings
-        recentBookings.forEach((booking) => {
+        // Add Labour Registrations
+        recentLabour.forEach((labour) => {
             recentActivity.push({
-                type: 'booking',
-                message: `New booking by ${booking?.user?.fullName || 'a client'}`,
-                time: timeAgo(booking.createdAt),
-                timeRaw: booking.createdAt,
+                type: 'labour',
+                message: `New labour registration: ${labour.fullName || 'Unnamed'}`,
+                time: timeAgo(labour.createdAt),
+                timeRaw: labour.createdAt,
             });
         });
 
-        // Add Stylist Updates or Approvals
-        updatedStylists.forEach((stylist) => {
-            const message = stylist.isApproved
-                ? `Stylist ${stylist.fullName || 'Unnamed'} updated profile`
-                : `New stylist ${stylist.fullName || 'Unnamed'} signup pending approval`;
+        // Add Contractor Updates or Approvals
+        recentContractors.forEach((contractor) => {
+            const message = contractor.isApproved
+                ? `Contractor ${contractor.fullName || 'Unnamed'} updated profile`
+                : `New contractor ${contractor.fullName || 'Unnamed'} signup pending approval`;
 
             recentActivity.push({
-                type: stylist.isApproved ? 'profile' : 'approval',
+                type: contractor.isApproved ? 'profile' : 'approval',
                 message,
-                time: timeAgo(stylist.updatedAt),
-                timeRaw: stylist.updatedAt,
-            });
-        });
-
-        // Add Product Updates
-        updatedProducts.forEach((product) => {
-            recentActivity.push({
-                type: 'product',
-                message: `Product "${product.name || 'Unnamed'}" listing updated`,
-                time: timeAgo(product.updatedAt),
-                timeRaw: product.updatedAt,
+                time: timeAgo(contractor.updatedAt),
+                timeRaw: contractor.updatedAt,
             });
         });
 
@@ -159,11 +145,10 @@ const dashboardOverViews = async (req, res) => {
             status: 200,
             success: true,
             data: {
-                totalUsers,
-                activeBookings,
-                completedServices,
-                revenue,
-                pendingApprovals,
+                totalLabour,
+                totalContractors,
+                pendingContractorApprovals,
+                approvedContractors,
                 recentActivity: cleanedRecentActivity,
             },
         });

@@ -1,16 +1,16 @@
 const express = require("express");
 const {
-    userSignup,
+    labourSignUp,
     sendEmail,
     verifyOTP,
     resetPassword,
     login,
     sendOTP,
     verifyMobileOTP,
-    contracterSignUp,
-    stylistLogout
+    contracterSignUp
 } = require('../controllers/authController');
 // const { verifyUser, verifyAdmin } = require("../middleware/verifyToken");
+const { uploadToS3 } = require("../config/AWSConfig");
 const rateLimit = require('express-rate-limit');
 
 const rateLimiter = rateLimit({
@@ -29,8 +29,8 @@ const otpRateLimiter = rateLimit({
 
 const router = express.Router();
 
-router.post('/labour/signup', userSignup);
-router.post('/contracter/signup', contracterSignUp);
+router.post('/labour/signup', uploadToS3, labourSignUp);
+router.post('/contracter/signup', uploadToS3, contracterSignUp);
 router.post('/send-email', otpRateLimiter, sendEmail);
 router.post('/verify-otp', verifyOTP);
 router.post('/reset-password', resetPassword);
@@ -38,6 +38,6 @@ router.post('/login', login);
 router.post('/user/login', login);
 router.post('/send-otp', otpRateLimiter, sendOTP);
 router.post('/verify-otp', verifyMobileOTP);
-router.post('/stylist/logout', stylistLogout);
+
 
 module.exports = router;

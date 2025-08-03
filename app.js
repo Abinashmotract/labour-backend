@@ -55,14 +55,10 @@ app.options('*', cors());
 
 const adminAuthRoute = require("./routes/admin/adminAuthRoute");
 const authRoute = require("./routes/authRoute");
-const serviceCategoryRoute = require("./routes/serviceCategoryRoute");
 const userRoute = require("./routes/userRoute");
-const productCategoryRoute = require("./routes/productCategoryRoute");
-const hairStylistRoute = require("./routes/hairStylistRoute");
-const productRoute = require("./routes/productRoute");
-const cartRoute = require("./routes/cartRoute");
-const packageRoute = require("./routes/packageRoute");
-const adminAppointmentRoute = require("./routes/admin/adminAppointmentRoute");
+
+const contractorAdminRoute = require("./routes/admin/contractorAdminRoute");
+const labourAdminRoute = require("./routes/admin/labourAdminRoute");
 
 const bodyParser = require("body-parser");
 const PORT = process.env.PORT || 3512;
@@ -75,14 +71,10 @@ app.use(express.urlencoded({ extended: false }));
 // Admin API routes
 app.use("/api/admin", adminAuthRoute);
 app.use("/api/auth", authRoute);
-app.use("/api/service", serviceCategoryRoute);
 app.use("/api/user", userRoute);
-app.use("/api/product-category", productCategoryRoute);
-app.use("/api/stylist", hairStylistRoute);
-app.use("/api/product", productRoute);
-app.use("/api/cart", cartRoute);
-app.use("/api/package", packageRoute);
-app.use("/api/admin", adminAppointmentRoute);
+
+app.use("/api/admin", contractorAdminRoute);
+app.use("/api/admin", labourAdminRoute);
 
 // Response handler Middleware
 app.use((obj, req, res, next) => {
