@@ -73,8 +73,8 @@ const UserSchema = new Schema(
 
     // deviceToken: { type: String },
     // refreshToken: { type: String },
-    // otp: { type: String },
-    // otpExpiration: { type: Date },
+    otp: { type: String },
+    otpExpiration: { type: Date },
     // lastOtpRequest: { type: Date },
     // isPhoneVerified: { type: Boolean, default: false },
     // otpFailedAttempts: { type: Number },

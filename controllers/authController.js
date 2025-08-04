@@ -131,7 +131,7 @@ const contracterSignUp = async (req, res) => {
       memoryCost: 65536,
       timeCost: 3,
       parallelism: 1,
-    });qqq
+    });
 
     // ✅ Create contracter
     const contracter = await Contracter.create({
@@ -333,130 +333,133 @@ const sendEmail = async (req, res, next) => {
   }
 };
 
-const verifyOTP = async (req, res, next) => {
-  const { otp, role, email } = req.body; // Added email for better validation
+
+const verifyOTP = async (req, res) => {
+  const { otp, email } = req.body;
 
   try {
-    // Validate inputs
-    if (!otp || !role || !['labour', 'contractor'].includes(role)) {
+    if (!otp || !email) {
       return res.status(400).json({
         success: false,
-        message: "Missing OTP or invalid role specified"
+        message: "OTP and email are required",
       });
     }
 
-    // Check if OTP is already being verified (prevent race conditions)
-    if (activeLocks.has(otp)) {
-      return res.status(429).json({
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(404).json({
         success: false,
-        message: "OTP verification already in progress. Please wait."
+        message: "User not found",
       });
     }
 
-    // Acquire lock
-    activeLocks.set(otp, true);
-
-    // Determine which model to query based on role
-    const Model = role === 'labour' ? User : Contracter;
-
-    // Find account with matching OTP that isn't expired
-    const account = await Model.findOne({
-      otp,
-      otpExpiration: { $gt: Date.now() },
-      ...(email && { email: email.toLowerCase() }) // Optional email verification
-    });
-
-    if (!account) {
-      activeLocks.delete(otp); // Release lock before returning
+    if (!user.otp || !user.otpExpiration) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired OTP"
+        message: "No OTP request found. Please request a new OTP.",
       });
     }
 
-    // Clear OTP fields
-    account.otp = undefined;
-    account.otpExpiration = undefined;
-    await account.save();
+    if (user.otpExpiration < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP has expired. Please request a new one.",
+      });
+    }
 
-    // Generate JWT token with role
+    if (user.otp !== otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP. Please try again.",
+      });
+    }
+
+    user.otp = undefined;
+    user.otpExpiration = undefined;
+    await user.save();
+
     const token = jwt.sign(
       {
-        id: account._id,
-        email: account.email,
-        role: account.role // Include role in token
+        id: user._id,
+        email: user.email,
+        role: user.role,
       },
       process.env.JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: "15m" }
     );
-
-    // Release lock
-    activeLocks.delete(otp);
 
     return res.status(200).json({
       success: true,
       message: "OTP verified successfully!",
       token,
-      role: account.role // Return role for client-side handling
+      role: user.role,
     });
 
   } catch (error) {
-    // Ensure lock is released on errors
-    activeLocks.delete(otp);
     console.error("OTP verification error:", error);
     return res.status(500).json({
       success: false,
-      status: 500,
-      message: error.message
+      message: "Server error: " + error.message,
     });
   }
 };
 
 // reset password
-const resetPassword = async (req, res, next) => {
+
+const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { email, role } = decoded; // Extract role from token
-
-    if (!email || !role || !['labour', 'contractor'].includes(role)) {
+    // Validate input
+    if (!token || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired token"
+        message: "Token and new password are required"
       });
     }
 
-    // 2. Find account based on role
-    const Model = role === 'labour' ? User : Contracter;
-    const account = await Model.findOne({ email });
+    // Verify and decode token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { email } = decoded;
 
-    if (!account) {
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid token payload"
+      });
+    }
+
+    // Find the user by email
+    const user = await User.findOne({ email });
+    if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Account not found"
+        message: "User not found"
       });
     }
 
+    // Hash new password
     const hashedPassword = await argon2.hash(newPassword, {
       type: argon2.argon2id,
       memoryCost: 65536,
       timeCost: 3,
-      parallelism: 1,
+      parallelism: 1
     });
 
-    account.password = hashedPassword;
-    await account.save();
+    // Save new password
+    user.password = hashedPassword;
+    await user.save();
 
     return res.status(200).json({
       success: true,
-      message: "Password reset successfully!"
+      message: "Password reset successfully"
     });
 
   } catch (error) {
     console.error("Password reset error:", error);
 
-    // Handle specific JWT errors
+    // Token-specific error handling
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
@@ -473,12 +476,12 @@ const resetPassword = async (req, res, next) => {
 
 //  mobile OTP setup apis
 const sendOTP = async (req, res) => {
-  const { phoneNumber } = req.body;
-  const result = "1234"
+  // const { phoneNumber } = req.body;
+  const result = "12345"
   // const result = await sendOTPMobile(`+${phoneNumber}`);
-  if (!result.success) {
-    return res.status(400).json({ error: result.error });
-  }
+  // if (!result.success) {
+  //   return res.status(400).json({ error: result.error });
+  // }
   res.status(200).json({
     success: true,
     status: 200,
@@ -496,6 +499,59 @@ const verifyMobileOTP = async (req, res) => {
   res.json({ message: "Phone verified!" });
 };
 
+const forgotPassword=async(req,res)=>{
+  try{
+    const {email}=req.body;
+    const userData=await User.findOne({email});
+    if(!userData){
+      return res.status(404).json({
+        success:false,
+        message:"User Not Found"
+      })
+    }
+
+    const otp= Math.floor(10000 + Math.random() * 90000);
+
+    userData.otp=otp;
+    userData.otpExpiration=new Date(Date.now()+10*60*1000);
+
+    await userData.save();
+
+
+    const mailTransporter = nodemailer.createTransport({
+      service: "GMAIL",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    const mailDetails = {
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: "Password Reset OTP",
+      html: `<p>Your OTP is: <strong>${otp}</strong> (valid for 15 minutes)</p>`
+    };
+
+    await mailTransporter.sendMail(mailDetails);
+
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent successfully",
+    });
+
+
+  }catch(error){
+    console.error("Password reset error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+}
+
 module.exports = {
   labourSignUp,
   contracterSignUp,
@@ -504,5 +560,6 @@ module.exports = {
   resetPassword,
   login,
   sendOTP,
-  verifyMobileOTP
+  verifyMobileOTP,
+  forgotPassword
 }

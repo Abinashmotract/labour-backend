@@ -7,7 +7,8 @@ const {
     login,
     sendOTP,
     verifyMobileOTP,
-    contracterSignUp
+    contracterSignUp,
+    forgotPassword
 } = require('../controllers/authController');
 // const { verifyUser, verifyAdmin } = require("../middleware/verifyToken");
 const { uploadToS3 } = require("../config/AWSConfig");
@@ -37,7 +38,9 @@ router.post('/reset-password', resetPassword);
 router.post('/login', login);
 router.post('/user/login', login);
 router.post('/send-otp', otpRateLimiter, sendOTP);
-router.post('/verify-otp', verifyMobileOTP);
+// router.post('/verify-otp', verifyMobileOTP);
+router.post('/forgot-password', forgotPassword);
+
 
 
 module.exports = router;
