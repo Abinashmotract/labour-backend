@@ -68,6 +68,9 @@ app.use(bodyParser.json());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Admin API routes
 app.use("/api/admin", adminAuthRoute);
 app.use("/api/auth", authRoute);

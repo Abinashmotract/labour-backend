@@ -11,7 +11,7 @@ const {
     forgotPassword
 } = require('../controllers/authController');
 // const { verifyUser, verifyAdmin } = require("../middleware/verifyToken");
-const { uploadToS3 } = require("../config/AWSConfig");
+const { handleFileUpload } = require("../config/multerConfig");
 const rateLimit = require('express-rate-limit');
 
 const rateLimiter = rateLimit({
@@ -30,8 +30,8 @@ const otpRateLimiter = rateLimit({
 
 const router = express.Router();
 
-router.post('/labour/signup', uploadToS3, labourSignUp);
-router.post('/contracter/signup', uploadToS3, contracterSignUp);
+router.post('/labour/signup', handleFileUpload, labourSignUp);
+router.post('/contracter/signup', handleFileUpload, contracterSignUp);
 router.post('/send-email', otpRateLimiter, sendEmail);
 router.post('/verify-otp', verifyOTP);
 router.post('/reset-password', resetPassword);

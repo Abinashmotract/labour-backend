@@ -342,7 +342,7 @@ const deleteMultipleUsers = async (req, res) => {
 const uploadProfileImage = async (req, res) => {
     try {
         const id = req.query.id ? req.query.id : req.user.id;
-        const fileUrl = req.fileLocations;
+        const fileUrl = req.fileLocations?.[0] || null;
 
         const user = await User.findById(id);
         if (!user) {
@@ -353,13 +353,17 @@ const uploadProfileImage = async (req, res) => {
             });
         }
 
-        user.profileImage = fileUrl || " ";
+        // Update profile picture field
+        user.profilePicture = fileUrl || "";
         await user.save();
 
         res.status(200).json({
             success: true,
             status: 200,
-            message: "Profile image uploaded successfully!"
+            message: "Profile image uploaded successfully!",
+            data: {
+                profilePicture: fileUrl
+            }
         });
     }
     catch (error) {

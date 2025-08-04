@@ -92,46 +92,7 @@ const dashboardOverViews = async (req, res) => {
         // === Stats ===
         const totalLabour = await User.countDocuments({ role: 'labour' });
         const totalContractors = await Contracter.countDocuments();
-        const pendingContractorApprovals = await Contracter.countDocuments({ isApproved: false });
-        const approvedContractors = await Contracter.countDocuments({ isApproved: true });
-
-        // === Dynamic Recent Activity ===
-        const recentActivity = [];
-
-        const [recentLabour, recentContractors] = await Promise.all([
-            User.find({ role: 'labour' }).sort({ createdAt: -1 }).limit(3),
-            Contracter.find().sort({ createdAt: -1 }).limit(3),
-        ]);
-
-        // Add Labour Registrations
-        recentLabour.forEach((labour) => {
-            recentActivity.push({
-                type: 'labour',
-                message: `New labour registration: ${labour.fullName || 'Unnamed'}`,
-                time: timeAgo(labour.createdAt),
-                timeRaw: labour.createdAt,
-            });
-        });
-
-        // Add Contractor Updates or Approvals
-        recentContractors.forEach((contractor) => {
-            const message = contractor.isApproved
-                ? `Contractor ${contractor.fullName || 'Unnamed'} updated profile`
-                : `New contractor ${contractor.fullName || 'Unnamed'} signup pending approval`;
-
-            recentActivity.push({
-                type: contractor.isApproved ? 'profile' : 'approval',
-                message,
-                time: timeAgo(contractor.updatedAt),
-                timeRaw: contractor.updatedAt,
-            });
-        });
-
-        // Sort by actual datetime (descending)
-        recentActivity.sort((a, b) => new Date(b.timeRaw) - new Date(a.timeRaw));
-
-        // Remove raw time before sending response
-        const cleanedRecentActivity = recentActivity.map(({ timeRaw, ...rest }) => rest);
+        const totalPendingContractors = await Contracter.countDocuments({ isApproved: false });
 
         // === Send Response ===
         return res.status(200).json({
@@ -140,9 +101,7 @@ const dashboardOverViews = async (req, res) => {
             data: {
                 totalLabour,
                 totalContractors,
-                pendingContractorApprovals,
-                approvedContractors,
-                recentActivity: cleanedRecentActivity,
+                totalPendingContractors
             },
         });
 

@@ -1,16 +1,20 @@
 const User = require("../models/userModel");
+const Contracter = require("../models/Contracter");
 const validator = require("validator");
 const nodemailer = require("nodemailer");
 const activeLocks = new Map(); // In-memory store for locks
 const jwt = require("jsonwebtoken");
 const argon2 = require("argon2");
-const twilio = require('twilio');
+const twilio = require("twilio");
 const { sendOTPMobile, verifyOTPMobile } = require("../utils/awsSNS");
 
-const Contracter = require("../models/Contracter");
-
-const { validateEmail, validatePassword, validatePhoneNumber, validateName, validatePostalCode } = require('../utils/validator');
-
+const {
+  validateEmail,
+  validatePassword,
+  validatePhoneNumber,
+  validateName,
+  validatePostalCode,
+} = require("../utils/validator");
 
 // user signup
 const labourSignUp = async (req, res) => {
@@ -23,7 +27,7 @@ const labourSignUp = async (req, res) => {
       work_experience,
       work_category,
       password,
-      gender
+      gender,
     } = req.body;
 
     const profileImage = req.fileLocations?.[0] || null;
@@ -37,7 +41,7 @@ const labourSignUp = async (req, res) => {
     // Check for existing email
     const [existingUser, existingContracter] = await Promise.all([
       User.findOne({ email: email_address.toLowerCase() }, { email: 1 }),
-      Contracter.findOne({ email: email_address.toLowerCase() }, { email: 1 })
+      Contracter.findOne({ email: email_address.toLowerCase() }, { email: 1 }),
     ]);
 
     if (existingUser || existingContracter) {
@@ -65,7 +69,7 @@ const labourSignUp = async (req, res) => {
       role: "labour",
       work_experience,
       work_category,
-      gender
+      gender,
     });
 
     await newUser.save();
@@ -78,7 +82,7 @@ const labourSignUp = async (req, res) => {
         fullName,
         email: email_address.toLowerCase(),
         profileImage,
-        gender
+        gender,
       },
     });
   } catch (error) {
@@ -114,14 +118,14 @@ const contracterSignUp = async (req, res) => {
     // ✅ Check for existing email
     const [existingUser, existingContracter] = await Promise.all([
       User.findOne({ email: email.toLowerCase() }, { email: 1 }),
-      Contracter.findOne({ email: email.toLowerCase() }, { email: 1 })
+      Contracter.findOne({ email: email.toLowerCase() }, { email: 1 }),
     ]);
 
     if (existingUser || existingContracter) {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Email already exists!"
+        message: "Email already exists!",
       });
     }
 
@@ -143,8 +147,8 @@ const contracterSignUp = async (req, res) => {
       password: hashedPassword,
       profilePicture: req.fileLocations[0] || "",
       gender,
-      role: 'contractor', // or 'contractor' if using same model
-      profileCompletionStep: "personalInfo"
+      role: "contractor", // or 'contractor' if using same model
+      profileCompletionStep: "personalInfo",
     });
 
     // ✅ Remove sensitive fields
@@ -154,13 +158,13 @@ const contracterSignUp = async (req, res) => {
       success: true,
       status: 201,
       message: "Contracter created successfully!",
-      data: responseData
+      data: responseData,
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
       status: 500,
-      message: error.message
+      message: error.message,
     });
   }
 };
@@ -170,24 +174,28 @@ const login = async (req, res, next) => {
   try {
     const { email, password, longitude, latitude, role } = req.body;
     if (!validator.isEmail(email.toLowerCase())) {
-      return res.status(400).json({ success: false, status: 400, message: "Invalid email format!" });
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "Invalid email format!",
+      });
     }
     if (!password) {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Password is required!"
+        message: "Password is required!",
       });
     }
-    if (!role || !['labour', 'contractor'].includes(role)) {
+    if (!role || !["labour", "contractor"].includes(role)) {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Invalid role specified!"
+        message: "Invalid role specified!",
       });
     }
     // Determine which model to use based on role
-    const Model = role === 'labour' ? User : Contracter;
+    const Model = role === "labour" ? User : Contracter;
     const account = await Model.findOne({ email: email.toLowerCase(), role });
     if (!account) {
       return res.status(404).json({
@@ -200,7 +208,9 @@ const login = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         status: 401,
-        message: `${role.charAt(0).toUpperCase() + role.slice(1)} not approved!`
+        message: `${
+          role.charAt(0).toUpperCase() + role.slice(1)
+        } not approved!`,
       });
     }
 
@@ -216,14 +226,18 @@ const login = async (req, res, next) => {
       account.location = {
         type: "Point",
         coordinates: [parseFloat(longitude), parseFloat(latitude)],
-        lastUpdated: new Date()
+        lastUpdated: new Date(),
       };
       await account.save();
     }
     const token = jwt.sign(
-      { id: account._id, email: account.email.toLowerCase(), role: account.role },
+      {
+        id: account._id,
+        email: account.email.toLowerCase(),
+        role: account.role,
+      },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: "24h" }
     );
     const refreshToken = jwt.sign(
       { id: account._id },
@@ -244,15 +258,14 @@ const login = async (req, res, next) => {
       refreshToken: accountData.refreshToken,
     };
 
-    if (role === 'contractor') {
+    if (role === "contractor") {
       responseData.profileCompletionStep = accountData.profileCompletionStep;
       responseData.isProfileCompleted = accountData.isProfileCompleted || false;
     }
 
     return res.status(200).json({
-      ...responseData
+      ...responseData,
     });
-
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({
@@ -271,28 +284,30 @@ const sendEmail = async (req, res, next) => {
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-    if (!role || !['labour', 'contractor'].includes(role)) {
+    if (!role || !["labour", "contractor"].includes(role)) {
       return res.status(400).json({ message: "Invalid role specified" });
     }
 
     // 2. Find Account by Role
-    const Model = role === 'labour' ? User : Contracter;
+    const Model = role === "labour" ? User : Contracter;
     const account = await Model.findOne({ email });
 
     if (!account) {
       return res.status(404).json({
         success: false,
-        message: `${role} not found with this email`
+        message: `${role} not found with this email`,
       });
     }
 
     // 3. OTP Cooldown Check
     const now = Date.now();
     if (account.otpExpiration && account.otpExpiration > now) {
-      const remainingTime = Math.ceil((account.otpExpiration - now) / (60 * 1000));
+      const remainingTime = Math.ceil(
+        (account.otpExpiration - now) / (60 * 1000)
+      );
       return res.status(429).json({
         success: false,
-        message: `Please wait ${remainingTime} minutes before requesting a new OTP`
+        message: `Please wait ${remainingTime} minutes before requesting a new OTP`,
       });
     }
 
@@ -305,52 +320,122 @@ const sendEmail = async (req, res, next) => {
       service: "GMAIL",
       auth: {
         user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
+        pass: process.env.SMTP_PASS,
+      },
     });
 
     const mailDetails = {
       from: process.env.SMTP_USER,
       to: email,
       subject: "Password Reset OTP",
-      html: `<p>Your OTP is: <strong>${otp}</strong> (valid for 15 minutes)</p>`
+      html: `<p>Your OTP is: <strong>${otp}</strong> (valid for 15 minutes)</p>`,
     };
 
     await mailTransporter.sendMail(mailDetails);
 
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully!"
+      message: "OTP sent successfully!",
     });
-
   } catch (error) {
     console.error("Error:", error);
     return res.status(500).json({
       success: false,
       status: 500,
-      message: error.message
+      message: error.message,
     });
   }
 };
 
-
-const verifyOTP = async (req, res) => {
-  const { otp, email } = req.body;
-
+const forgotPassword = async (req, res) => {
   try {
-    if (!otp || !email) {
+    const { email, role } = req.body;
+
+    // ✅ Basic validations
+    if (!email || !validator.isEmail(email)) {
       return res.status(400).json({
         success: false,
-        message: "OTP and email are required",
+        message: "Valid email is required",
       });
     }
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!role || !["labour", "contractor"].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role specified",
+      });
+    }
+
+    // ✅ Select model by role
+    const Model = role === "labour" ? User : Contracter;
+
+    // ✅ Find user/contractor
+    const userData = await Model.findOne({ email: email.toLowerCase() });
+
+    if (!userData) {
+      return res.status(404).json({
+        success: false,
+        message: `${role.charAt(0).toUpperCase() + role.slice(1)} not found`,
+      });
+    }
+
+    // ✅ Generate OTP
+    const otp = Math.floor(10000 + Math.random() * 90000).toString();
+    userData.otp = otp;
+    userData.otpExpiration = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    await userData.save();
+
+    // ✅ Email transport setup
+    const mailTransporter = nodemailer.createTransport({
+      service: "GMAIL",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
+
+    // ✅ Email body
+    const mailDetails = {
+      from: process.env.SMTP_USER,
+      to: email,
+      subject: "Password Reset OTP",
+      html: `<p>Your OTP is: <strong>${otp}</strong><br/>This OTP is valid for 15 minutes.</p>`,
+    };
+
+    // ✅ Send email
+    await mailTransporter.sendMail(mailDetails);
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent successfully!",
+    });
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+const verifyOTP = async (req, res) => {
+  const { otp, email, role } = req.body;
+
+  try {
+    if (!otp || !email || !role || !["labour", "contractor"].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP, email and valid role are required",
+      });
+    }
+
+    const Model = role === "labour" ? User : Contracter;
+    const user = await Model.findOne({ email: email.toLowerCase() });
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found",
+        message: `${role} not found`,
       });
     }
 
@@ -395,7 +480,6 @@ const verifyOTP = async (req, res) => {
       token,
       role: user.role,
     });
-
   } catch (error) {
     console.error("OTP verification error:", error);
     return res.status(500).json({
@@ -406,151 +490,136 @@ const verifyOTP = async (req, res) => {
 };
 
 // reset password
-
 const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
 
   try {
-    // Validate input
     if (!token || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: "Token and new password are required"
+        message: "Token and new password are required",
       });
     }
 
-    // Verify and decode token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { email } = decoded;
+    const { email, role } = decoded;
 
-    if (!email) {
+    if (!email || !role || !["labour", "contractor"].includes(role)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid token payload"
+        message: "Invalid or expired token",
       });
     }
 
-    // Find the user by email
-    const user = await User.findOne({ email });
+    const Model = role === "labour" ? User : Contracter;
+    const user = await Model.findOne({ email: email.toLowerCase() });
+
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User not found"
+        message: `${role} not found`,
       });
     }
 
-    // Hash new password
     const hashedPassword = await argon2.hash(newPassword, {
       type: argon2.argon2id,
       memoryCost: 65536,
       timeCost: 3,
-      parallelism: 1
+      parallelism: 1,
     });
 
-    // Save new password
     user.password = hashedPassword;
     await user.save();
 
     return res.status(200).json({
       success: true,
-      message: "Password reset successfully"
+      message: "Password reset successfully",
     });
-
   } catch (error) {
     console.error("Password reset error:", error);
 
-    // Token-specific error handling
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+    if (
+      error.name === "JsonWebTokenError" ||
+      error.name === "TokenExpiredError"
+    ) {
       return res.status(401).json({
         success: false,
-        message: "Invalid or expired token"
+        message: "Invalid or expired token",
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "Internal server error",
     });
   }
 };
 
 //  mobile OTP setup apis
 const sendOTP = async (req, res) => {
-  // const { phoneNumber } = req.body;
-  const result = "12345"
-  // const result = await sendOTPMobile(`+${phoneNumber}`);
-  // if (!result.success) {
-  //   return res.status(400).json({ error: result.error });
-  // }
-  res.status(200).json({
-    success: true,
-    status: 200,
-    message: "OTP sent!",
-    data: result
-  });
-};
+  const { phoneNumber, role } = req.body;
 
-const verifyMobileOTP = async (req, res) => {
-  const { phoneNumber, code } = req.body;
-  const result = await verifyOTPMobile(`+${phoneNumber}`, code);
-  if (!result.success) {
-    return res.status(400).json({ error: result.error });
-  }
-  res.json({ message: "Phone verified!" });
-};
-
-const forgotPassword=async(req,res)=>{
-  try{
-    const {email}=req.body;
-    const userData=await User.findOne({email});
-    if(!userData){
-      return res.status(404).json({
-        success:false,
-        message:"User Not Found"
-      })
+  try {
+    if (!phoneNumber || !role || !["labour", "contractor"].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number and valid role are required",
+      });
     }
 
-    const otp= Math.floor(10000 + Math.random() * 90000);
-
-    userData.otp=otp;
-    userData.otpExpiration=new Date(Date.now()+10*60*1000);
-
-    await userData.save();
-
-
-    const mailTransporter = nodemailer.createTransport({
-      service: "GMAIL",
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
-
-    const mailDetails = {
-      from: process.env.SMTP_USER,
-      to: email,
-      subject: "Password Reset OTP",
-      html: `<p>Your OTP is: <strong>${otp}</strong> (valid for 15 minutes)</p>`
-    };
-
-    await mailTransporter.sendMail(mailDetails);
-
+    // Replace below line with actual OTP logic if using a service
+    const otp = "12345"; // or sendOTPMobile(`+${phoneNumber}`)
 
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully",
+      message: "OTP sent!",
+      data: otp,
     });
-
-
-  }catch(error){
-    console.error("Password reset error:", error);
-
+  } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
-}
+};
+
+const verifyMobileOTP = async (req, res) => {
+  const { phoneNumber, code, role } = req.body;
+
+  try {
+    if (
+      !phoneNumber ||
+      !code ||
+      !role ||
+      !["labour", "contractor"].includes(role)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number, OTP code, and valid role are required",
+      });
+    }
+
+    // Replace with actual verification logic (e.g., Twilio/Msg91)
+    const result = await verifyOTPMobile(`+${phoneNumber}`, code);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.error,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Phone verified!",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 module.exports = {
   labourSignUp,
@@ -561,5 +630,5 @@ module.exports = {
   login,
   sendOTP,
   verifyMobileOTP,
-  forgotPassword
-}
+  forgotPassword,
+};
