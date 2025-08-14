@@ -2,7 +2,7 @@ pipeline {
     agent any
  
     environment {
-          IMAGE_NAME = "docker.io/kartikeytiwari/braid-on-call-backend"
+          IMAGE_NAME = "docker.io/abinashsinha01/braid-on-call-backend"
         IMAGE_TAG = "${BUILD_NUMBER}"
         CONTAINER_PORT = "3512"
         HOST_PORT = "3512"
