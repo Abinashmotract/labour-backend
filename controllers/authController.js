@@ -16,24 +16,42 @@ let otpStore = {};
 // Function to send OTP (static for now, replace with actual logic)
 const sendOTP = async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
-    if (!phoneNumber) {
+    const { phoneNumber, userId } = req.body;
+
+    if (!phoneNumber && !userId) {
       return res.status(400).json({
         success: false,
-        message: "Phone number is required",
+        message: "Phone number or UserId is required",
       });
     }
 
-    // Static OTP for now
-    const otp = "888888";
+    const otp = "888888"; // static for now
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 min valid
 
-    // Store OTP in memory (map phoneNumber -> otp)
-    otpStore[phoneNumber] = otp;
+    let user;
+    if (phoneNumber) {
+      user = await User.findOne({ phoneNumber });
+      if (!user) {
+        // agar user exist nahi hai to new create karo
+        user = new User({ phoneNumber });
+      }
+    } else if (userId) {
+      user = await User.findById(userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Save OTP in DB
+    user.otp = otp;
+    user.otpExpiry = otpExpiry;
+    await user.save();
 
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully (static)",
-      otp // ⚠️ Only for testing, remove in prod
+      message: "OTP sent successfully",
+      otp // ⚠️ testing only, remove later
     });
   } catch (err) {
     console.error("Send OTP Error:", err);
@@ -47,24 +65,33 @@ const sendOTP = async (req, res) => {
 // Function to verify OTP
 const verifyOtp = async (req, res) => {
   try {
-    const { phoneNumber, otp } = req.body;
-    if (!otpStore[phoneNumber]) {
+    const { phoneNumber, userId, otp } = req.body;
+
+    let user;
+    if (phoneNumber) {
+      user = await User.findOne({ phoneNumber });
+    } else if (userId) {
+      user = await User.findById(userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Check OTP and expiry
+    if (!user.otp || !user.otpExpiry || user.otpExpiry < new Date()) {
       return res.status(400).json({ success: false, message: "OTP not sent or expired" });
     }
-    if (otpStore[phoneNumber] !== otp) {
+
+    if (user.otp !== otp) {
       return res.status(400).json({ success: false, message: "Invalid OTP" });
     }
-    let user = await User.findOne({ phoneNumber });
-    if (!user) {
-      user = new User({
-        phoneNumber,
-        isPhoneVerified: true
-      });
-    } else {
-      user.isPhoneVerified = true;
-    }
+
+    // Mark verified
+    user.isPhoneVerified = true;
+    user.otp = undefined;
+    user.otpExpiry = undefined;
     await user.save();
-    delete otpStore[phoneNumber];
 
     return res.json({ success: true, message: "Phone verified successfully" });
   } catch (err) {
@@ -226,7 +253,6 @@ const login = async (req, res, next) => {
     });
   }
 };
-
 
 const sendEmail = async (req, res, next) => {
   const { email, role } = req.body;

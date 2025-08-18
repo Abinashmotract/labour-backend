@@ -24,8 +24,7 @@ router.post('/profile-image', verifyAllToken(['labour']), uploadProfileImage)
 
 // admin routes
 router.patch('/admin/update/:id', updateUserProfile);
-router.get('/admin/get-all', verifyAllToken(['admin']), getAllUsers);
-// router.patch('/admin/verify-user/:id', verifyAllToken(['admin']), verifyUserProfile);
+router.get('/admin/get-all', verifyAllToken(['admin', 'labour']), getAllUsers);
 router.put('/admin/update-user-details', verifyAllToken(['admin']), updateUserDetails);
 router.delete('/admin/delete/:id', verifyAllToken(['admin']), deleteUser);
 router.get('/admin/search-users', verifyAllToken(['admin']), searchUsers);

@@ -4,23 +4,15 @@ const createError = require('../../middleware/error');
 const User = require('../../models/userModel');
 const Contracter = require('../../models/Contracter');
 
-
-// Hardcoded admin credentials for demonstration
-const adminEmail = 'stylecap@gmail.com';
-const adminPassword = 'stylecap123';
-
 // Login function
 const loginAdmin = async (req, res, next) => {
     try {
         const { email, password } = req.body;
-
         if (!email || !password) {
             return next(createError(400, 'Email and password are required'));
         }
-
         const adminEmail = 'labour@gmail.com';
         const hashedAdminPassword = await bcrypt.hash('labourAdmin123', 10);
-
         if (email !== adminEmail) {
             return res.status(401).json({
                 message: "Authentication failed. Invalid email or password",
@@ -28,7 +20,6 @@ const loginAdmin = async (req, res, next) => {
                 success: false,
             });
         }
-
         const isPasswordCorrect = await bcrypt.compare(password, hashedAdminPassword);
         if (!isPasswordCorrect) {
             return res.status(401).json({
@@ -37,7 +28,6 @@ const loginAdmin = async (req, res, next) => {
                 success: false,
             });
         }
-
         const jwtSecret = process.env.JWT_SECRET || 'your_jwt_secret';
         const token = jwt.sign({ role: 'admin' }, jwtSecret, { expiresIn: '7d' });
 
@@ -46,7 +36,6 @@ const loginAdmin = async (req, res, next) => {
             secure: process.env.NODE_ENV === 'development',
             maxAge: 7 * 24 * 60 * 60 * 1000,
         });
-
         res.status(200).json({
             status: 200,
             success: true,
@@ -93,24 +82,19 @@ const timeAgo = (date) => {
     return `${Math.floor(seconds / 86400)} days ago`;
 };
 
-
+// Dashboard overview function
 const dashboardOverViews = async (req, res) => {
     try {
-        // === Stats ===
         const totalLabour = await User.countDocuments({ role: 'labour' });
         const totalContractors = await Contracter.countDocuments();
         const pendingContractorApprovals = await Contracter.countDocuments({ isApproved: false });
         const approvedContractors = await Contracter.countDocuments({ isApproved: true });
-
-        // === Dynamic Recent Activity ===
         const recentActivity = [];
 
         const [recentLabour, recentContractors] = await Promise.all([
             User.find({ role: 'labour' }).sort({ createdAt: -1 }).limit(3),
             Contracter.find().sort({ createdAt: -1 }).limit(3),
         ]);
-
-        // Add Labour Registrations
         recentLabour.forEach((labour) => {
             recentActivity.push({
                 type: 'labour',
@@ -119,8 +103,6 @@ const dashboardOverViews = async (req, res) => {
                 timeRaw: labour.createdAt,
             });
         });
-
-        // Add Contractor Updates or Approvals
         recentContractors.forEach((contractor) => {
             const message = contractor.isApproved
                 ? `Contractor ${contractor.fullName || 'Unnamed'} updated profile`
@@ -133,14 +115,8 @@ const dashboardOverViews = async (req, res) => {
                 timeRaw: contractor.updatedAt,
             });
         });
-
-        // Sort by actual datetime (descending)
         recentActivity.sort((a, b) => new Date(b.timeRaw) - new Date(a.timeRaw));
-
-        // Remove raw time before sending response
         const cleanedRecentActivity = recentActivity.map(({ timeRaw, ...rest }) => rest);
-
-        // === Send Response ===
         return res.status(200).json({
             status: 200,
             success: true,
@@ -163,9 +139,48 @@ const dashboardOverViews = async (req, res) => {
     }
 };
 
+// Create user by Admin (labour/contractor)
+const adminCreateUser = async (req, res, next) => {
+    try {
+        const { firstName, lastName, email, phoneNumber, role } = req.body;
+        if (!firstName || !lastName || !email || !phoneNumber || !role) {
+            return next(createError(400, "All fields are required (firstName, lastName, email, phoneNumber, role)"));
+        }
+        if (!["labour", "contractor"].includes(role)) {
+            return next(createError(400, "Role must be either 'labour' or 'contractor'"));
+        }
+        const existingUser = await User.findOne({ phoneNumber });
+        if (existingUser) {
+            return next(createError(400, "Phone number already registered"));
+        }
+        const otp = "123456";
+        const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry
+        const newUser = new User({
+            firstName,
+            lastName,
+            email,
+            phoneNumber,
+            role,
+            otp,
+            otpExpiry,
+            isPhoneVerified: true, // ✅ Admin verified during creation
+        });
+        await newUser.save();
+        return res.status(201).json({
+            success: true,
+            message: `New ${role} created successfully by admin`,
+            data: newUser,
+        });
+
+    } catch (error) {
+        console.error("Error in adminCreateUser:", error);
+        return next(createError(500, "Internal Server Error"));
+    }
+};
 
 module.exports = {
     loginAdmin,
     logoutAdmin,
-    dashboardOverViews
+    dashboardOverViews,
+    adminCreateUser
 };
