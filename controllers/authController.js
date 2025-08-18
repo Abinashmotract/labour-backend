@@ -11,11 +11,79 @@ const Contracter = require("../models/Contracter");
 
 const { validateEmail, validatePassword, validatePhoneNumber, validateName, validatePostalCode } = require('../utils/validator');
 
+let otpStore = {};
+
+// Function to send OTP (static for now, replace with actual logic)
+const sendOTP = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number is required",
+      });
+    }
+
+    // Static OTP for now
+    const otp = "888888";
+
+    // Store OTP in memory (map phoneNumber -> otp)
+    otpStore[phoneNumber] = otp;
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent successfully (static)",
+      otp // ⚠️ Only for testing, remove in prod
+    });
+  } catch (err) {
+    console.error("Send OTP Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+// Function to verify OTP
+const verifyOtp = async (req, res) => {
+  try {
+    const { phoneNumber, otp } = req.body;
+
+    // Check in otpStore instead of user.otp
+    if (!otpStore[phoneNumber]) {
+      return res.status(400).json({ success: false, message: "OTP not sent or expired" });
+    }
+
+    if (otpStore[phoneNumber] !== otp) {
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    }
+
+    // Find or create user for this phone
+    let user = await User.findOne({ phoneNumber });
+    if (!user) {
+      user = new User({
+        phoneNumber,
+        isPhoneVerified: true
+      });
+    } else {
+      user.isPhoneVerified = true;
+    }
+    await user.save();
+    delete otpStore[phoneNumber];
+
+    return res.json({ success: true, message: "Phone verified successfully" });
+  } catch (err) {
+    console.error("Verify OTP Error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 // user signup
 const labourSignUp = async (req, res) => {
   try {
-    const {
+    let {
+      firstName,
+      lastName,
       fullName,
       email_address,
       mobile_no,
@@ -23,71 +91,75 @@ const labourSignUp = async (req, res) => {
       work_experience,
       work_category,
       password,
-      gender
+      gender,
+      lat,
+      lng
     } = req.body;
 
-    const profileImage = req.fileLocations?.[0] || null;
+    if ((!firstName || !lastName) && fullName) {
+      const parts = fullName.trim().split(" ");
+      firstName = parts[0];
+      lastName = parts.slice(1).join(" ") || "";
+    }
 
-    // Basic validations
+    let profileImage = null;
+    if (req.fileLocations && req.fileLocations.length > 0) {
+      profileImage = req.fileLocations[0];
+    }
+
     validateEmail(email_address);
     validatePassword(password);
     validatePhoneNumber(mobile_no);
-    validateName(fullName);
+    validateName(firstName);
 
-    // Check for existing email
-    const [existingUser, existingContracter] = await Promise.all([
-      User.findOne({ email: email_address.toLowerCase() }, { email: 1 }),
-      Contracter.findOne({ email: email_address.toLowerCase() }, { email: 1 })
-    ]);
-
-    if (existingUser || existingContracter) {
-      return res.status(400).json({
-        success: false,
-        status: 400,
-        message: "Email already exists!",
-      });
+    const user = await User.findOne({ phoneNumber: mobile_no });
+    if (!user || !user.isPhoneVerified) {
+      return res.status(400).json({ success: false, message: "Phone not verified" });
     }
 
-    const hashedPassword = await argon2.hash(password, {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 1,
-    });
+    // fix: check if already registered
+    if (user.email && user.password) {
+      return res.status(400).json({ success: false, message: "User already registered" });
+    }
 
-    const newUser = new User({
-      fullName,
-      email: email_address.toLowerCase(),
-      phoneNumber: mobile_no,
-      addressLine1: address,
-      password: hashedPassword,
-      profilePicture: profileImage,
-      role: "labour",
-      work_experience,
-      work_category,
-      gender
-    });
+    const hashedPassword = await argon2.hash(password);
 
-    await newUser.save();
+    user.firstName = firstName;
+    user.lastName = lastName || "";
+    user.email = email_address.toLowerCase();
+    user.password = hashedPassword;
+    user.addressLine1 = address;
+    if (profileImage) user.profilePicture = profileImage;
+    user.work_experience = work_experience;
+    user.work_category = work_category;
+    user.gender = gender || "male";
+    user.role = "labour";
+
+    if (lat && lng) {
+      user.location = {
+        type: "Point",
+        coordinates: [parseFloat(lng), parseFloat(lat)]
+      };
+    }
+
+    await user.save();
 
     return res.status(201).json({
       success: true,
-      status: 201,
       message: "User registered successfully!",
-      data: {
-        fullName,
-        email: email_address.toLowerCase(),
-        profileImage,
-        gender
-      },
+      // data: {
+      //   firstName,
+      //   lastName,
+      //   email: email_address,
+      //   mobile_no,
+      //   gender,
+      //   profileImage: user.profilePicture || null,
+      //   location: user.location
+      // }
     });
   } catch (error) {
     console.error("Signup Error:", error);
-    return res.status(500).json({
-      success: false,
-      status: 500,
-      message: error.message,
-    });
+    return res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -471,21 +543,6 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-//  mobile OTP setup apis
-const sendOTP = async (req, res) => {
-  const { phoneNumber } = req.body;
-  const result = "1234"
-  // const result = await sendOTPMobile(`+${phoneNumber}`);
-  if (!result.success) {
-    return res.status(400).json({ error: result.error });
-  }
-  res.status(200).json({
-    success: true,
-    status: 200,
-    message: "OTP sent!",
-    data: result
-  });
-};
 
 const verifyMobileOTP = async (req, res) => {
   const { phoneNumber, code } = req.body;
@@ -504,5 +561,6 @@ module.exports = {
   resetPassword,
   login,
   sendOTP,
+  verifyOtp,
   verifyMobileOTP
 }

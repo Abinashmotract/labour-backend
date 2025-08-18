@@ -3,87 +3,37 @@ const Schema = mongoose.Schema;
 
 const UserSchema = new Schema(
   {
-    fullName: {
-      type: String,
-      required: true,
-    },
-    email: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    phoneNumber: {
-      type: String,
-      required: true,
-    },
+    firstName: { type: String, required: false },
+    lastName: { type: String, required: false },
+    email: { type: String, required: false },
+    phoneNumber: { type: String, required: true, unique: true },
+
+    otp: { type: String }, // 6 digit OTP
+    otpExpiry: { type: Date }, // OTP expiry time
+    isPhoneVerified: { type: Boolean, default: false },
+
     gender: { type: String, enum: ["male", "female", "others"], default: "male" },
-    addressLine1: {
-      type: String,
-      required: true,
-    },
-    work_experience: {
-      type: String,
-      required: false,
-    },
-    work_category: {
-      type: String,
-      required: false,
-    },
-    password: {
-      type: String,
-      required: true,
-    },
-    profilePicture: {
-      type: String,
-      required: false,
-    },
-    role: {
-      type: String,
-      enum: ["labour", "contractor", "admin"],
-      default: "labour",
-    },
+    addressLine1: { type: String, required: false },
+    work_experience: { type: String },
+    work_category: { type: String },
 
-    // ======= Commented but preserved fields below =======
-    // age: { type: Number },
-    // addressLine2: { type: String },
-    // city: { type: String },
-    // region: { type: String },
-    // postalCode: { type: String },
-    // gender: { type: String, enum: ["male", "female", "others"], default: "male" },
-    // location: {
-    //   type: {
-    //     type: String,
-    //     enum: ["Point"],
-    //     default: "Point",
-    //   },
-    //   coordinates: {
-    //     type: [Number],
-    //     default: [0, 0],
-    //     validate: {
-    //       validator: function (v) {
-    //         return v.length === 2 &&
-    //           Math.abs(v[0]) <= 180 &&
-    //           Math.abs(v[1]) <= 90;
-    //       },
-    //       message: "Invalid GeoJSON coordinates"
-    //     },
-    //     lastUpdated: { type: Date, default: null }
-    //   },
-    // },
+    password: { type: String, required: false },
+    profilePicture: { type: String },
 
-    // deviceToken: { type: String },
-    // refreshToken: { type: String },
-    // otp: { type: String },
-    // otpExpiration: { type: Date },
-    // lastOtpRequest: { type: Date },
-    // isPhoneVerified: { type: Boolean, default: false },
-    // otpFailedAttempts: { type: Number },
-    // otpAttempts: { type: Number, default: 0 },
+    role: { type: String, enum: ["labour", "contractor", "admin"], default: "labour" },
+
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point"
+      },
+      coordinates: {
+        type: [Number], // [lng, lat] order MongoDB ke hisaab se
+        default: [0, 0]
+      }
+    },
   },
   { timestamps: true }
 );
-
-// Uncomment if you re-enable location field
-// UserSchema.index({ location: "2dsphere" });
-
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('labour', UserSchema);
