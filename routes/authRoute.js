@@ -1,13 +1,11 @@
 const express = require("express");
 const {
-    labourSignUp,
+    roleBasisSignUp,
     sendEmail,
     verifyOTP,
     resetPassword,
     login,
     sendOTP,
-    verifyMobileOTP,
-    contracterSignUp,
     verifyOtp
 } = require('../controllers/authController');
 // const { verifyUser, verifyAdmin } = require("../middleware/verifyToken");
@@ -30,20 +28,18 @@ const otpRateLimiter = rateLimit({
 
 const router = express.Router();
 // ---------labour--------------
-router.post('/labour/signup', uploadToS3, labourSignUp);
+router.post('/labour/signup', uploadToS3, roleBasisSignUp);
 router.post('/labour/verify-otp', verifyOtp);
 router.post('/labour/send-otp', otpRateLimiter, sendOTP);
 
 // ---------labour--------------
 
-router.post('/contracter/signup', uploadToS3, contracterSignUp);
 router.post('/send-email', otpRateLimiter, sendEmail);
 router.post('/verify-otp', verifyOTP);
 router.post('/reset-password', resetPassword);
 router.post('/login', login);
 router.post('/user/login', login);
 
-router.post('/verify-otp', verifyMobileOTP);
 
 
 module.exports = router;

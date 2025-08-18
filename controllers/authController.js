@@ -48,17 +48,12 @@ const sendOTP = async (req, res) => {
 const verifyOtp = async (req, res) => {
   try {
     const { phoneNumber, otp } = req.body;
-
-    // Check in otpStore instead of user.otp
     if (!otpStore[phoneNumber]) {
       return res.status(400).json({ success: false, message: "OTP not sent or expired" });
     }
-
     if (otpStore[phoneNumber] !== otp) {
       return res.status(400).json({ success: false, message: "Invalid OTP" });
     }
-
-    // Find or create user for this phone
     let user = await User.findOne({ phoneNumber });
     if (!user) {
       user = new User({
@@ -79,170 +74,80 @@ const verifyOtp = async (req, res) => {
 };
 
 // user signup
-const labourSignUp = async (req, res) => {
+const roleBasisSignUp = async (req, res) => {
   try {
-    let {
+    const {
       firstName,
       lastName,
-      fullName,
-      email_address,
-      mobile_no,
-      address,
-      work_experience,
-      work_category,
+      email,
+      phoneNumber,
       password,
+      addressLine1,
+      work_category,
+      work_experience,
       gender,
+      role,  // "labour" or "contractor"
       lat,
       lng
     } = req.body;
 
-    if ((!firstName || !lastName) && fullName) {
-      const parts = fullName.trim().split(" ");
-      firstName = parts[0];
-      lastName = parts.slice(1).join(" ") || "";
-    }
+    const user = await User.findOne({ phoneNumber });
 
-    let profileImage = null;
-    if (req.fileLocations && req.fileLocations.length > 0) {
-      profileImage = req.fileLocations[0];
-    }
-
-    validateEmail(email_address);
-    validatePassword(password);
-    validatePhoneNumber(mobile_no);
-    validateName(firstName);
-
-    const user = await User.findOne({ phoneNumber: mobile_no });
     if (!user || !user.isPhoneVerified) {
       return res.status(400).json({ success: false, message: "Phone not verified" });
     }
-
-    // fix: check if already registered
-    if (user.email && user.password) {
+    if (user.email) {
       return res.status(400).json({ success: false, message: "User already registered" });
     }
 
+    // Hash password
     const hashedPassword = await argon2.hash(password);
 
+    // Update user details
     user.firstName = firstName;
-    user.lastName = lastName || "";
-    user.email = email_address.toLowerCase();
+    user.lastName = lastName;
+    user.email = email.toLowerCase();
     user.password = hashedPassword;
-    user.addressLine1 = address;
-    if (profileImage) user.profilePicture = profileImage;
-    user.work_experience = work_experience;
+    user.addressLine1 = addressLine1;
     user.work_category = work_category;
-    user.gender = gender || "male";
-    user.role = "labour";
+    user.work_experience = work_experience;
+    user.gender = gender;
+    user.role = role; // ✅ labour / contractor
 
     if (lat && lng) {
-      user.location = {
-        type: "Point",
-        coordinates: [parseFloat(lng), parseFloat(lat)]
-      };
+      user.location = { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] };
     }
 
     await user.save();
 
     return res.status(201).json({
       success: true,
-      message: "User registered successfully!",
-      // data: {
-      //   firstName,
-      //   lastName,
-      //   email: email_address,
-      //   mobile_no,
-      //   gender,
-      //   profileImage: user.profilePicture || null,
-      //   location: user.location
-      // }
+      message: "User registered successfully",
+      data: {
+        firstName,
+        lastName,
+        email,
+        phoneNumber,
+        role: user.role,
+        gender: user.gender,
+        location: user.location
+      }
     });
   } catch (error) {
-    console.error("Signup Error:", error);
     return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// controllers/authController.js
-const contracterSignUp = async (req, res) => {
-  try {
-    const {
-      contracterName,
-      email,
-      mobile,
-      address,
-      typeOfWorkOffered,
-      password,
-      profileImage,
-      gender,
-    } = req.body;
-
-    // ✅ Basic validations
-    validateEmail(email);
-    validatePassword(password);
-    validatePhoneNumber(mobile);
-    validateName(contracterName);
-
-    // ✅ Check for existing email
-    const [existingUser, existingContracter] = await Promise.all([
-      User.findOne({ email: email.toLowerCase() }, { email: 1 }),
-      Contracter.findOne({ email: email.toLowerCase() }, { email: 1 })
-    ]);
-
-    if (existingUser || existingContracter) {
-      return res.status(400).json({
-        success: false,
-        status: 400,
-        message: "Email already exists!"
-      });
-    }
-
-    // ✅ Hash password
-    const hashedPassword = await argon2.hash(password, {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 1,
-    });
-
-    // ✅ Create contracter
-    const contracter = await Contracter.create({
-      fullName: contracterName,
-      email: email.toLowerCase(),
-      phoneNumber: mobile,
-      address,
-      work_category: typeOfWorkOffered,
-      password: hashedPassword,
-      profilePicture: req.fileLocations[0] || "",
-      gender,
-      role: 'contractor', // or 'contractor' if using same model
-      profileCompletionStep: "personalInfo"
-    });
-
-    // ✅ Remove sensitive fields
-    const { password: _, ...responseData } = contracter.toObject();
-
-    return res.status(201).json({
-      success: true,
-      status: 201,
-      message: "Contracter created successfully!",
-      data: responseData
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      status: 500,
-      message: error.message
-    });
   }
 };
 
 // login user
 const login = async (req, res, next) => {
   try {
-    const { email, password, longitude, latitude, role } = req.body;
-    if (!validator.isEmail(email.toLowerCase())) {
-      return res.status(400).json({ success: false, status: 400, message: "Invalid email format!" });
+    const { phoneNumber, password, longitude, latitude, role } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "Phone number is required!"
+      });
     }
     if (!password) {
       return res.status(400).json({
@@ -251,31 +156,28 @@ const login = async (req, res, next) => {
         message: "Password is required!"
       });
     }
-    if (!role || !['labour', 'contractor'].includes(role)) {
+    if (!role || !["labour", "contractor"].includes(role)) {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Invalid role specified!"
+        message: "Invalid role specified! Must be labour or contractor"
       });
     }
-    // Determine which model to use based on role
-    const Model = role === 'labour' ? User : Contracter;
-    const account = await Model.findOne({ email: email.toLowerCase(), role });
+    const account = await User.findOne({ phoneNumber, role });
     if (!account) {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: `${role.charAt(0).toUpperCase() + role.slice(1)} not found!`,
+        message: `${role} with this phone number not found!`,
       });
     }
-    if (account.isApproved === false) {
+    if (role === "contractor" && account.isApproved === false) {
       return res.status(401).json({
         success: false,
         status: 401,
-        message: `${role.charAt(0).toUpperCase() + role.slice(1)} not approved!`
+        message: "Contractor not approved!"
       });
     }
-
     const isPasswordValid = await argon2.verify(account.password, password);
     if (!isPasswordValid) {
       return res.status(400).json({
@@ -287,15 +189,14 @@ const login = async (req, res, next) => {
     if (longitude && latitude) {
       account.location = {
         type: "Point",
-        coordinates: [parseFloat(longitude), parseFloat(latitude)],
-        lastUpdated: new Date()
+        coordinates: [parseFloat(longitude), parseFloat(latitude)]
       };
       await account.save();
     }
     const token = jwt.sign(
-      { id: account._id, email: account.email.toLowerCase(), role: account.role },
+      { id: account._id, phoneNumber: account.phoneNumber, role: account.role },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' }
+      { expiresIn: "24h" }
     );
     const refreshToken = jwt.sign(
       { id: account._id },
@@ -304,25 +205,16 @@ const login = async (req, res, next) => {
     );
     account.refreshToken = refreshToken;
     await account.save();
-
-    const { password: _, ...accountData } = account.toObject();
-
-    const responseData = {
+    const { password: _, otp, otpExpiry, ...accountData } = account.toObject();
+    return res.status(200).json({
       success: true,
       status: 200,
       message: "Login successful!",
       id: accountData._id,
       token,
       refreshToken: accountData.refreshToken,
-    };
-
-    if (role === 'contractor') {
-      responseData.profileCompletionStep = accountData.profileCompletionStep;
-      responseData.isProfileCompleted = accountData.isProfileCompleted || false;
-    }
-
-    return res.status(200).json({
-      ...responseData
+      role: accountData.role,
+      phoneNumber: accountData.phoneNumber
     });
 
   } catch (error) {
@@ -334,6 +226,7 @@ const login = async (req, res, next) => {
     });
   }
 };
+
 
 const sendEmail = async (req, res, next) => {
   const { email, role } = req.body;
@@ -543,24 +436,12 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-
-const verifyMobileOTP = async (req, res) => {
-  const { phoneNumber, code } = req.body;
-  const result = await verifyOTPMobile(`+${phoneNumber}`, code);
-  if (!result.success) {
-    return res.status(400).json({ error: result.error });
-  }
-  res.json({ message: "Phone verified!" });
-};
-
 module.exports = {
-  labourSignUp,
-  contracterSignUp,
+  roleBasisSignUp,
   sendEmail,
   verifyOTP,
   resetPassword,
   login,
   sendOTP,
-  verifyOtp,
-  verifyMobileOTP
+  verifyOtp
 }
