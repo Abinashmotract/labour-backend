@@ -2,7 +2,7 @@ pipeline {
     agent any
  
     environment {
-          IMAGE_NAME = "docker.io/kartikeytiwari/braid-on-call-backend"
+          IMAGE_NAME = "docker.io/abinashsinha01/braid-on-call-backend"
         IMAGE_TAG = "${BUILD_NUMBER}"
         CONTAINER_PORT = "3512"
         HOST_PORT = "3512"
@@ -92,7 +92,7 @@ pipeline {
             script {
                 echo "📩 Sending deployment email..."
                 emailext (
-                    to: 'kartikey.tiwari@aayaninfotech.com',
+                    to: 'abinas.h0870@gmail.com',
                     subject: "Deployment Pipeline - ${currentBuild.fullDisplayName}",
                     body: "Job '${env.JOB_NAME} [#${env.BUILD_NUMBER}]' completed with status: ${currentBuild.currentResult}"
                 )
