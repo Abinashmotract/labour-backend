@@ -1,33 +1,30 @@
-const User = require("../models/userModel");
-
 const mongoose = require("mongoose");
-
+const User = require("../models/userModel");
 const { sendEmail } = require("../service/emailService");
 const { sendNotification } = require("../service/notificationService");
-
 
 // get users
 const getAllUsers = async (req, res) => {
     try {
-        const users = await User.find({ role: "labour" })
-            .select("-password -refreshToken -location -favorites -otp -otpAttempts -otpFailedAttempts -lastOtpRequest");
-        if (!users) {
+        const users = await User.find({ role: { $in: ["labour", "contractor"] } })
+            .select("-password -refreshToken -otp -otpAttempts -otpFailedAttempts -lastOtpRequest");
+
+        if (!users || users.length === 0) {
             return res.status(200).json({
                 success: true,
                 status: 200,
-                message: "No Users found!",
-                data: users
+                message: "No signup users found!",
+                data: []
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             status: 200,
-            message: "Users fetched successfully!",
+            message: "Signup users fetched successfully!",
             data: users
         });
-    }
-    catch (error) {
+    } catch (error) {
         return res.status(500).json({
             success: false,
             status: 500,
@@ -35,6 +32,38 @@ const getAllUsers = async (req, res) => {
         });
     }
 };
+
+// get user by id (labour / contractor)
+const getUserById = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const user = await User.findById(id)
+            .select("-password -refreshToken -otp -otpAttempts -otpFailedAttempts -lastOtpRequest");
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                status: 404,
+                message: "User not found!"
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            status: 200,
+            message: "User fetched successfully!",
+            data: user
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            status: 500,
+            message: error.message
+        });
+    }
+};
+
 
 const updateUserDetails = async (req, res) => {
     try {
@@ -72,35 +101,6 @@ const updateUserDetails = async (req, res) => {
             status: 500,
             message: error.message,
         });
-    }
-};
-
-// get user by id
-const getUserById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const user = await User.findById(id)
-            .select("-password -refreshToken -favorites -otp -otpAttempts -otpFailedAttempts -lastOtpRequest");
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                status: 404,
-                message: "User not found!"
-            });
-        }
-        res.status(200).json({
-            success: true,
-            status: 200,
-            message: "User fetched successfully!",
-            data: user
-        })
-    }
-    catch (error) {
-        return res.status(500).json({
-            success: false,
-            status: 500,
-            message: error.message
-        })
     }
 };
 
@@ -281,8 +281,6 @@ const searchUsers = async (req, res) => {
         });
     }
 };
-
-
 
 // multiple delete users
 const deleteMultipleUsers = async (req, res) => {
