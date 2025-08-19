@@ -11,8 +11,6 @@ const Contracter = require("../models/Contracter");
 
 const { validateEmail, validatePassword, validatePhoneNumber, validateName, validatePostalCode } = require('../utils/validator');
 
-let otpStore = {};
-
 // Function to send OTP (static for now, replace with actual logic)
 const sendOTP = async (req, res) => {
   try {
@@ -66,34 +64,38 @@ const sendOTP = async (req, res) => {
 const verifyOtp = async (req, res) => {
   try {
     const { phoneNumber, userId, otp } = req.body;
-
     let user;
-    if (phoneNumber) {
-      user = await User.findOne({ phoneNumber });
-    } else if (userId) {
+    if (userId) {
       user = await User.findById(userId);
+    } else if (phoneNumber) {
+      user = await User.findOne({ phoneNumber });
     }
-
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-
-    // Check OTP and expiry
-    if (!user.otp || !user.otpExpiry || user.otpExpiry < new Date()) {
-      return res.status(400).json({ success: false, message: "OTP not sent or expired" });
-    }
-
-    if (user.otp !== otp) {
+    if (!user.otp || user.otp !== otp) {
       return res.status(400).json({ success: false, message: "Invalid OTP" });
     }
-
-    // Mark verified
+    if (!user.otpExpiry || user.otpExpiry < new Date()) {
+      return res.status(400).json({ success: false, message: "OTP expired" });
+    }
     user.isPhoneVerified = true;
     user.otp = undefined;
     user.otpExpiry = undefined;
+    if (user.createdByAdmin && user.email && user.firstName) {
+      user.signupComplete = true;
+    }
     await user.save();
+    return res.json({
+      success: true,
+      message: "Phone verified successfully",
+      data: {
+        userId: user._id,
+        phoneNumber: user.phoneNumber,
+        signupComplete: user.signupComplete
+      }
+    });
 
-    return res.json({ success: true, message: "Phone verified successfully" });
   } catch (err) {
     console.error("Verify OTP Error:", err);
     return res.status(500).json({ success: false, message: err.message });
