@@ -144,34 +144,46 @@ const adminCreateUser = async (req, res, next) => {
     try {
         const { firstName, lastName, email, phoneNumber, role } = req.body;
         if (!firstName || !lastName || !email || !phoneNumber || !role) {
-            return next(createError(400, "All fields are required (firstName, lastName, email, phoneNumber, role)"));
+            return next(createError(400, "All fields are required"));
         }
         if (!["labour", "contractor"].includes(role)) {
-            return next(createError(400, "Role must be either 'labour' or 'contractor'"));
+            return next(createError(400, "Invalid role"));
         }
-        const existingUser = await User.findOne({ phoneNumber });
-        if (existingUser) {
-            return next(createError(400, "Phone number already registered"));
+        let user = await User.findOne({ phoneNumber });
+        // if (user && user.isPhoneVerified) {
+        //     return next(createError(400, "Phone number already registered"));
+        // }
+        const otp = "888888"; 
+        const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
+        if (user) {
+            user.firstName = firstName;
+            user.lastName = lastName;
+            user.email = email.toLowerCase();
+            user.role = role;
+            user.otp = otp;
+            user.otpExpiry = otpExpiry;
+        } else {
+            user = new User({
+                firstName,
+                lastName,
+                email: email.toLowerCase(),
+                phoneNumber,
+                role,
+                otp,
+                otpExpiry,
+                isPhoneVerified: false,
+                createdByAdmin: true 
+            });
         }
-        const otp = "123456";
-        const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry
-        const newUser = new User({
-            firstName,
-            lastName,
-            email,
-            phoneNumber,
-            role,
-            otp,
-            otpExpiry,
-            isPhoneVerified: true, // ✅ Admin verified during creation
-        });
-        await newUser.save();
-        return res.status(201).json({
+        await user.save();
+        return res.status(200).json({
             success: true,
-            message: `New ${role} created successfully by admin`,
-            data: newUser,
+            message: `User ${user._id} created/updated by admin. OTP sent for verification`,
+            data: {
+                userId: user._id,
+                phoneNumber: user.phoneNumber
+            }
         });
-
     } catch (error) {
         console.error("Error in adminCreateUser:", error);
         return next(createError(500, "Internal Server Error"));

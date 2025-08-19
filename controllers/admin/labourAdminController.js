@@ -5,10 +5,7 @@ const createError = require('../../middleware/error');
 const getAllLabour = async (req, res) => {
     try {
         const { page = 1, limit = 10, search } = req.query;
-        
         let query = { role: 'labour' };
-        
-        // Search functionality
         if (search) {
             query.$or = [
                 { fullName: { $regex: search, $options: 'i' } },
@@ -16,7 +13,6 @@ const getAllLabour = async (req, res) => {
                 { work_category: { $regex: search, $options: 'i' } }
             ];
         }
-        
         const labour = await User.find(query)
             .select('-password -refreshToken -otp -otpAttempts -otpFailedAttempts -lastOtpRequest')
             .sort({ createdAt: -1 })
@@ -24,7 +20,6 @@ const getAllLabour = async (req, res) => {
             .skip((page - 1) * limit);
             
         const total = await User.countDocuments(query);
-        
         return res.status(200).json({
             success: true,
             status: 200,
