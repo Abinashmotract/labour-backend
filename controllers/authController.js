@@ -115,16 +115,18 @@ const roleBasisSignUp = async (req, res) => {
       work_category,
       work_experience,
       gender,
-      role,  // "labour" or "contractor"
+      role,
       lat,
       lng
     } = req.body;
 
+    // Find user by phone number
     const user = await User.findOne({ phoneNumber });
 
     if (!user || !user.isPhoneVerified) {
       return res.status(400).json({ success: false, message: "Phone not verified" });
     }
+
     if (user.email) {
       return res.status(400).json({ success: false, message: "User already registered" });
     }
@@ -141,10 +143,15 @@ const roleBasisSignUp = async (req, res) => {
     user.work_category = work_category;
     user.work_experience = work_experience;
     user.gender = gender;
-    user.role = role; // ✅ labour / contractor
+    user.role = role; // labour / contractor
 
     if (lat && lng) {
       user.location = { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] };
+    }
+
+    // ✅ Save uploaded profile picture URL (from S3 middleware)
+    if (req.fileLocations && req.fileLocations.profilePicture) {
+      user.profilePicture = req.fileLocations.profilePicture;
     }
 
     await user.save();
@@ -159,10 +166,12 @@ const roleBasisSignUp = async (req, res) => {
         phoneNumber,
         role: user.role,
         gender: user.gender,
-        location: user.location
+        location: user.location,
+        profilePicture: user.profilePicture || null
       }
     });
   } catch (error) {
+    console.error("Signup error:", error);
     return res.status(500).json({ success: false, message: error.message });
   }
 };
