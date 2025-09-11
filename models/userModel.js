@@ -19,7 +19,7 @@ const UserSchema = new Schema(
     role: { type: String, enum: ["labour", "contractor", "admin"], default: "labour" },
     location: {
       type: { type: String, enum: ["Point"], default: "Point" },
-      coordinates: { type: [Number], default: [0, 0] } // [lng, lat]
+      coordinates: { type: [Number], default: [0, 0] } 
     },
   },
   { timestamps: true }

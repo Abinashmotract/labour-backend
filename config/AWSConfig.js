@@ -56,77 +56,70 @@ const getS3Client = async () => {
 };
 
 const storage = multer.memoryStorage();
-const upload = multer({ 
+const upload = multer({
     storage,
-    limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
-    },
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
     fileFilter: (req, file, cb) => {
-        // Accept images only
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image files are allowed!'), false);
-        }
+        if (file.mimetype.startsWith('image/')) cb(null, true);
+        else cb(new Error('Only image files are allowed!'), false);
     }
-}).single("files");
+});
 
-const uploadToS3 = async (req, res, next) => {
-    upload(req, res, async (err) => {
-        console.log("Upload middleware debug:");
-        console.log("req.file:", req.file);
+// ✅ Correct: define upload middleware for multiple fields
+const uploadToS3 = (req, res, next) => {
+    const uploader = upload.fields([
+        { name: 'profilePicture', maxCount: 1 },
+        { name: 'documents', maxCount: 5 }
+    ]);
+
+    uploader(req, res, async (err) => {
+        console.log("req.files:", req.files);
         console.log("req.body:", req.body);
-        
-        if (err) {
-            console.error("Multer error:", err);
-            return res.status(400).json({ error: err.message });
-        }
 
-        if (!req.file) {
-            console.log("No file uploaded");
-            req.fileLocations = [];
-            return next();
-        }
+        if (err) return res.status(400).json({ error: err.message });
 
         try {
-            // For local development, if AWS credentials are not available, 
-            // we'll store the file information locally
-            if (!process.env.AWS_ACCESS_KEY_ID && !process.env.AWS_SECRET_ACCESS_KEY) {
-                console.log("AWS credentials not found, storing file info locally");
-                const fileInfo = {
-                    originalname: req.file.originalname,
-                    mimetype: req.file.mimetype,
-                    size: req.file.size,
-                    buffer: req.file.buffer.toString('base64')
-                };
-                req.fileLocations = [`local://${Date.now()}-${req.file.originalname}`];
-                return next();
+            const { s3Client, config } = await getS3Client();
+
+            req.fileLocations = {};
+
+            // Single profilePicture
+            if (req.files['profilePicture'] && req.files['profilePicture'][0]) {
+                const file = req.files['profilePicture'][0];
+                const fileKey = `profile/${Date.now()}-${file.originalname}`;
+                await s3Client.putObject({
+                    Bucket: config.bucketName,
+                    Key: fileKey,
+                    Body: file.buffer,
+                    ContentType: file.mimetype,
+                });
+                req.fileLocations.profilePicture = `https://${config.bucketName}.s3.${config.region}.amazonaws.com/${fileKey}`;
             }
 
-            const { s3Client, config } = await getS3Client();
-            const fileKey = `${Date.now()}-${req.file.originalname}`;
-            const params = {
-                Bucket: config.bucketName,
-                Key: fileKey,
-                Body: req.file.buffer,
-                ContentType: req.file.mimetype,
-            };
+            // Multiple documents
+            if (req.files['documents']) {
+                req.fileLocations.documents = [];
+                for (const file of req.files['documents']) {
+                    const fileKey = `documents/${Date.now()}-${file.originalname}`;
+                    await s3Client.putObject({
+                        Bucket: config.bucketName,
+                        Key: fileKey,
+                        Body: file.buffer,
+                        ContentType: file.mimetype,
+                    });
+                    req.fileLocations.documents.push(`https://${config.bucketName}.s3.${config.region}.amazonaws.com/${fileKey}`);
+                }
+            }
 
-            await s3Client.putObject(params);
-
-            const fileUrl = `https://${config.bucketName}.s3.${config.region}.amazonaws.com/${fileKey}`;
-            req.fileLocations = [fileUrl]; // single file
-            next();
         } catch (uploadError) {
-            console.error("Upload Error:", uploadError);
-            // For development, if AWS upload fails, still allow the request to continue
-            // with a local file reference
-            req.fileLocations = [`local://${Date.now()}-${req.file.originalname}`];
-            console.log("AWS upload failed, using local file reference");
-            return next();
+            console.error("AWS upload error:", uploadError);
         }
+
+        next();
     });
 };
+
+module.exports = { uploadToS3 };
 
 
 module.exports = { uploadToS3 };

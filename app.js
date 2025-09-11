@@ -13,14 +13,6 @@ const app = express();
 // Create an HTTP server from Express
 const server = http.createServer(app);
 
-// Socket.io setup
-// const io = new Server(server, {
-//   cors: {
-//     origin: "http://localhost:3000", // Frontend origin
-//     credentials: true,
-//   },
-// });
-
 
 // Middleware setup
 app.use(cookieParser()); // Parse cookies
@@ -60,6 +52,7 @@ const userRoute = require("./routes/userRoute");
 const contractorAdminRoute = require("./routes/admin/contractorAdminRoute");
 const labourAdminRoute = require("./routes/admin/labourAdminRoute");
 const skillRoute = require("./routes/admin/skillRoute");
+const jobPostRoute = require("./routes/admin/jobPostRoute");
 
 const bodyParser = require("body-parser");
 const PORT = process.env.PORT || 3512;
@@ -77,6 +70,7 @@ app.use("/api/user", userRoute);
 app.use("/api/admin", contractorAdminRoute);
 app.use("/api/admin", labourAdminRoute);
 app.use("/api/skill/admin", skillRoute);
+app.use("/api/admin", jobPostRoute);
 
 // Response handler Middleware
 app.use((obj, req, res, next) => {
