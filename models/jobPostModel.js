@@ -21,7 +21,7 @@ const jobPostSchema = new mongoose.Schema(
     },
     contractor: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Contracter", // contractor model reference
+      ref: "labour", // contractor model reference
       required: true,
     },
     skills: [
@@ -35,6 +35,12 @@ const jobPostSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    acceptedLabours: [
+      {
+        labour: { type: mongoose.Schema.Types.ObjectId, ref: "labour" },
+        acceptedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );

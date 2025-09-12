@@ -64,7 +64,6 @@ const getUserById = async (req, res) => {
     }
 };
 
-
 const updateUserDetails = async (req, res) => {
     try {
         const { userId, ...rest } = req.body;

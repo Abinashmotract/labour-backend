@@ -53,6 +53,7 @@ const contractorAdminRoute = require("./routes/admin/contractorAdminRoute");
 const labourAdminRoute = require("./routes/admin/labourAdminRoute");
 const skillRoute = require("./routes/admin/skillRoute");
 const jobPostRoute = require("./routes/admin/jobPostRoute");
+const jobApplicationRoute = require("./routes/jobApplicationRoute");
 
 const bodyParser = require("body-parser");
 const PORT = process.env.PORT || 3512;
@@ -71,6 +72,7 @@ app.use("/api/admin", contractorAdminRoute);
 app.use("/api/admin", labourAdminRoute);
 app.use("/api/skill/admin", skillRoute);
 app.use("/api/admin", jobPostRoute);
+app.use("/api/job", jobApplicationRoute);
 
 // Response handler Middleware
 app.use((obj, req, res, next) => {
