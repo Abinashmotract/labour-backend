@@ -4,103 +4,73 @@ const Skill = require("../../models/skillModel");
 // Create Job Post (Admin)
 const createJobPost = async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      location,
-      jobTiming,
-      skills,
-      labourersRequired,
-      validUntil,
-      longitude,
-      latitude,
+    const { 
+      title, 
+      description, 
+      location,  // This could be either string or object
+      jobTiming, 
+      skills, 
+      labourersRequired, 
+      validUntil, 
+      longitude, 
+      latitude 
     } = req.body;
-    if (
-      (!title ||
-        !description ||
-        !location ||
-        !jobTiming ||
-        !labourersRequired ||
-        !validUntil,
-      !longitude || !latitude)
-    ) {
+
+    // Handle both formats
+    let locationData;
+    if (typeof location === 'object' && location.coordinates) {
+      // If location is already an object with coordinates
+      locationData = location;
+    } else {
+      // If location is string and coordinates are separate
+      locationData = {
+        type: "Point",
+        coordinates: [longitude, latitude],
+        address: location
+      };
+    }
+
+    // validation
+    if (!title || !description || !jobTiming || !labourersRequired || !validUntil) {
       return res.status(400).json({
         success: false,
-        status: 400,
-        message:
-          "All fields (title, description, location, jobTiming, labourersRequired, validUntil, longitude, latitude) are required",
+        message: "All fields (title, description, jobTiming, labourersRequired, validUntil) are required",
       });
     }
-    if (!skills || !Array.isArray(skills) || skills.length === 0) {
+
+    if (!locationData.coordinates || !locationData.coordinates.length === 2) {
       return res.status(400).json({
         success: false,
-        status: 400,
-        message: "At least one skill is required",
+        message: "Valid coordinates are required",
       });
     }
-    // Validate labourers required
-    if (labourersRequired < 1) {
-      return res.status(400).json({
-        success: false,
-        message: "At least 1 labourer is required",
-      });
-    }
-    // Validate coordinates
-    if (isNaN(parseFloat(longitude)) || isNaN(parseFloat(latitude))) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid longitude or latitude coordinates",
-      });
-    }
-    // Validate validUntil date
-    const validUntilDate = new Date(validUntil);
-    if (validUntilDate <= new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: "Valid until date must be in the future",
-      });
-    }
-    // check skill exist in db
-    const validSkills = await Skill.find({ _id: { $in: skills } });
-    if (validSkills.length !== skills.length) {
-      return res.status(400).json({
-        success: false,
-        status: 400,
-        message: "Some skills are invalid",
-      });
-    }
+
     const jobPost = new JobPost({
       title,
       description,
-      location: {
-        type: "Point",
-        coordinates: [parseFloat(longitude), parseFloat(latitude)],
-      },
+      location: locationData,
       jobTiming,
-      contractor: req.user?.id || null,
+      contractor: req.user.id,
       skills,
       labourersRequired,
-      validUntil,
+      validUntil: new Date(validUntil),
     });
+
     await jobPost.save();
-    const populatedJobPost = await JobPost.findById(jobPost._id)
-      .populate("skills", "name")
-      .populate("contractor", "firstName lastName email phoneNumber");
+
     return res.status(201).json({
       success: true,
-      status: 201,
       message: "Job post created successfully",
+      data: jobPost,
     });
   } catch (error) {
     console.error("Error in createJobPost:", error);
     return res.status(500).json({
       success: false,
-      status: 500,
       message: "Internal Server Error",
     });
   }
 };
-
 // Get All Job Posts
 const getAllJobPosts = async (req, res) => {
   try {
