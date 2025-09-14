@@ -7,7 +7,7 @@ const createJobPost = async (req, res) => {
     const { 
       title, 
       description, 
-      location,  // This could be either string or object
+      location, 
       jobTiming, 
       skills, 
       labourersRequired, 
@@ -15,36 +15,28 @@ const createJobPost = async (req, res) => {
       longitude, 
       latitude 
     } = req.body;
-
-    // Handle both formats
     let locationData;
     if (typeof location === 'object' && location.coordinates) {
-      // If location is already an object with coordinates
       locationData = location;
     } else {
-      // If location is string and coordinates are separate
       locationData = {
         type: "Point",
         coordinates: [longitude, latitude],
         address: location
       };
     }
-
-    // validation
     if (!title || !description || !jobTiming || !labourersRequired || !validUntil) {
       return res.status(400).json({
         success: false,
         message: "All fields (title, description, jobTiming, labourersRequired, validUntil) are required",
       });
     }
-
     if (!locationData.coordinates || !locationData.coordinates.length === 2) {
       return res.status(400).json({
         success: false,
         message: "Valid coordinates are required",
       });
     }
-
     const jobPost = new JobPost({
       title,
       description,
@@ -55,9 +47,7 @@ const createJobPost = async (req, res) => {
       labourersRequired,
       validUntil: new Date(validUntil),
     });
-
     await jobPost.save();
-
     return res.status(201).json({
       success: true,
       message: "Job post created successfully",
