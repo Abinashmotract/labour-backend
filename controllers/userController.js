@@ -34,11 +34,11 @@ const getAllUsers = async (req, res) => {
 };
 
 // get user by id (labour / contractor)
-const getUserById = async (req, res) => {
+const getLoggedInUser = async (req, res) => {
     try {
-        const { id } = req.params;
+        const userId = req.user.id; // coming from token middleware
 
-        const user = await User.findById(id)
+        const user = await User.findById(userId)
             .select("-password -refreshToken -otp -otpAttempts -otpFailedAttempts -lastOtpRequest");
 
         if (!user) {
@@ -417,7 +417,7 @@ module.exports = {
     getAllUsers,
     // verifyUserProfile,
     updateRoleBasisUser,
-    getUserById,
+    getLoggedInUser,
     updateUserProfile,
     deleteUser,
     updateLocation,

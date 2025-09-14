@@ -1,7 +1,7 @@
 const express = require("express");
 const {
     getAllUsers,
-    getUserById,
+    getLoggedInUser,
     updateUserProfile,
     deleteUser,
     updateLocation,
@@ -9,18 +9,16 @@ const {
     deleteMultipleUsers,
     uploadProfileImage,
     updateRoleBasisUser,
-    // verifyUserProfile
 } = require('../controllers/userController');
 const { verifyUser, verifyAdmin, verifyAllToken } = require("../middleware/verifyToken");
 
 
 const router = express.Router();
 
-router.get('/get/:id', getUserById);
+router.get('/me', verifyAllToken(['labour', 'contractor']), getLoggedInUser);
 router.patch('/update/:id', updateUserProfile);
 router.patch('/update-location', verifyAllToken(['labour']), updateLocation);
 router.post('/profile-image', verifyAllToken(['labour']), uploadProfileImage)
-
 
 // admin routes
 router.put('/role/update-user-details', verifyAllToken(['labour', 'contractor']), updateRoleBasisUser);
