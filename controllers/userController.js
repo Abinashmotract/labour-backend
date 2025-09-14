@@ -64,43 +64,86 @@ const getUserById = async (req, res) => {
     }
 };
 
-const updateUserDetails = async (req, res) => {
-    try {
-        const { userId, ...rest } = req.body;
-        if (!userId) {
-            return res.status(400).json({
-                success: false,
-                status: 400,
-                message: "User ID is required",
-            });
-        }
-        if (rest.email) {
-            delete rest.email;
-        }
-        const updatedUser = await User.findByIdAndUpdate(userId, rest, {
-            new: true,
-            runValidators: true,
-        }).select("-password -refreshToken -otp -otpAttempts -otpFailedAttempts");
-        if (!updatedUser) {
-            return res.status(404).json({
-                success: false,
-                status: 404,
-                message: "User not found",
-            });
-        }
-        return res.status(200).json({
-            success: true,
-            status: 200,
-            message: "User details updated successfully",
-            data: updatedUser,
-        });
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            status: 500,
-            message: error.message,
-        });
+const updateRoleBasisUser = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "User ID is required",
+      });
     }
+    let user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        status: 404,
+        message: "User not found",
+      });
+    }
+    if (!["labour", "contractor"].includes(user.role)) {
+      return res.status(403).json({
+        success: false,
+        status: 403,
+        message: "Only labour/contractor users can be updated here",
+      });
+    }
+    const {
+      firstName,
+      lastName,
+      email,
+      addressLine1,
+      work_category,
+      work_experience,
+      gender,
+      lat,
+      lng,
+    } = req.body;
+
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (email) user.email = email.toLowerCase();
+    if (addressLine1) user.addressLine1 = addressLine1;
+    if (work_category) user.work_category = work_category;
+    if (work_experience) user.work_experience = work_experience;
+    if (gender) user.gender = gender;
+    if (lat && lng) {
+      user.location = {
+        type: "Point",
+        coordinates: [parseFloat(lng), parseFloat(lat)],
+      };
+    }
+    if (req.fileLocations && req.fileLocations.profilePicture) {
+      user.profilePicture = req.fileLocations.profilePicture;
+    }
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "User updated successfully",
+      data: {
+        userId: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        role: user.role,
+        gender: user.gender,
+        work_category: user.work_category,
+        work_experience: user.work_experience,
+        location: user.location,
+        profilePicture: user.profilePicture,
+      },
+    });
+  } catch (error) {
+    console.error("Update role basis user error:", error);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: error.message,
+    });
+  }
 };
 
 const updateUserProfile = async (req, res) => {
@@ -373,7 +416,7 @@ const uploadProfileImage = async (req, res) => {
 module.exports = {
     getAllUsers,
     // verifyUserProfile,
-    updateUserDetails,
+    updateRoleBasisUser,
     getUserById,
     updateUserProfile,
     deleteUser,
