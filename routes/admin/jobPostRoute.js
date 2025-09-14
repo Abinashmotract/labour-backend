@@ -1,10 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const { verifyAllToken } = require("../../middleware/verifyToken");
-const { createJobPost, getAllJobPosts } = require("../../controllers/admin/jobPostController");
+const { createJobPost, getAllJobPosts, updateJobPost, deleteJobPost, getNearbyJobs } = require("../../controllers/admin/jobPostController");
 
 // Contractor can create job post
 router.post("/job-posts", verifyAllToken(["contractor"]), createJobPost);
+router.put("/update-job-posts/:id", verifyAllToken(["contractor"]), updateJobPost);
+router.delete("/delete-job-posts/:id", verifyAllToken(["contractor"]), deleteJobPost); 
+
+router.get("/nearby-jobs", verifyAllToken(["labour"]), getNearbyJobs);
 
 // Get all job posts (public / labour can see)
 router.get("/all-jobs", getAllJobPosts);

@@ -71,7 +71,7 @@ app.use("/api/user", userRoute);
 app.use("/api/admin", contractorAdminRoute);
 app.use("/api/admin", labourAdminRoute);
 app.use("/api/skill/admin", skillRoute);
-app.use("/api/admin", jobPostRoute);
+app.use("/api/contractor", jobPostRoute);
 app.use("/api/job", jobApplicationRoute);
 
 // Response handler Middleware
