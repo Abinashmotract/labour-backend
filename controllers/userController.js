@@ -422,23 +422,43 @@ const uploadProfileImage = async (req, res) => {
 // Get all labours (for contractor side)
 const getAllLabours = async (req, res) => {
   try {
-    const labours = await User.find({ role: "labour" }).select(
+    const contractorId = req.user.id;
+    const contractor = await User.findById(contractorId);
+    if (!contractor || contractor.role !== "contractor") {
+      return res.status(403).json({
+        success: false,
+        status: 403,
+        message: "Only contractors can access this data",
+      });
+    }
+    const contractorCategory = contractor.work_category;
+
+    if (!contractorCategory) {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "Contractor has no work category defined",
+      });
+    }
+    const labours = await User.find({
+      role: "labour",
+      work_category: contractorCategory,
+    }).select(
       "-password -refreshToken -otp -otpAttempts -otpFailedAttempts -lastOtpRequest"
     );
     if (!labours || labours.length === 0) {
       return res.status(200).json({
         success: true,
         status: 200,
-        message: "No labours found!",
+        message: "No matching labours found!",
         total: 0,
         data: [],
       });
     }
-
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Labours fetched successfully!",
+      message: "Matching labours fetched successfully!",
       total: labours.length,
       data: labours,
     });
