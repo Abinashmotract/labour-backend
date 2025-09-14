@@ -104,6 +104,59 @@ const getAllJobPosts = async (req, res) => {
   }
 };
 
+const getContractorJobs = async (req, res) => {
+  try {
+    const { showExpired, longitude, latitude, maxDistance = 15000 } = req.query;
+
+    // ✅ Sirf logged-in contractor ke jobs
+    let filter = { 
+      contractor: req.user.id,  // 🔹 contractor filter add kiya
+      isActive: true, 
+      isFilled: false 
+    };
+
+    if (longitude && latitude) {
+      const userLongitude = parseFloat(longitude);
+      const userLatitude = parseFloat(latitude);
+
+      filter.location = {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [userLongitude, userLatitude],
+          },
+          $maxDistance: parseInt(maxDistance),
+        },
+      };
+    }
+
+    if (showExpired !== "true") {
+      filter.validUntil = { $gt: new Date() };
+    }
+
+    const jobs = await JobPost.find(filter)
+      .populate(
+        "contractor",
+        "firstName lastName email phoneNumber profilePicture"
+      )
+      .populate("skills", "name")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "Contractor jobs fetched successfully",
+      data: jobs,
+    });
+  } catch (error) {
+    console.error("Error in getContractorJobs:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+
 // Update Job Post
 const updateJobPost = async (req, res) => {
   try {
@@ -357,6 +410,7 @@ const getNearbyJobs = async (req, res) => {
 module.exports = {
   createJobPost,
   getAllJobPosts,
+  getContractorJobs,
   updateJobPost,
   deleteJobPost,
   getNearbyJobs,
