@@ -7,7 +7,7 @@ const { createJobPost, getAllJobPosts, updateJobPost, deleteJobPost, getNearbyJo
 router.post("/job-posts", verifyAllToken(["contractor"]), createJobPost);
 router.put("/update-job-posts/:id", verifyAllToken(["contractor"]), updateJobPost);
 router.delete("/delete-job-posts/:id", verifyAllToken(["contractor"]), deleteJobPost); 
-router.get("/nearby-jobs", verifyAllToken(["labour"]), getNearbyJobs);
+router.get("/nearby-jobs", verifyAllToken(["labour", "admin"]), getNearbyJobs);
 
 router.get("/all-contractor-jobs", verifyAllToken(["contractor"]), getContractorJobs);
 

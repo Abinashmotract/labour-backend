@@ -4,20 +4,24 @@ const Skill = require("../../models/skillModel");
 // Create Job Post (Admin)
 const createJobPost = async (req, res) => {
   try {
-    const { 
-      title, 
-      description, 
-      location, 
-      jobTiming, 
-      skills, 
-      labourersRequired, 
-      validUntil, 
-      longitude, 
-      latitude 
+    const {
+      title,
+      description,
+      location,
+      jobTiming,
+      skills,
+      labourersRequired,
+      validUntil,
+      longitude,
+      latitude
     } = req.body;
     let locationData;
     if (typeof location === 'object' && location.coordinates) {
-      locationData = location;
+      locationData = {
+        type: "Point",
+        coordinates: location.coordinates,
+        address: location.address || ""
+      };
     } else {
       locationData = {
         type: "Point",
@@ -109,10 +113,10 @@ const getContractorJobs = async (req, res) => {
     const { showExpired, longitude, latitude, maxDistance = 15000 } = req.query;
 
     // ✅ Sirf logged-in contractor ke jobs
-    let filter = { 
+    let filter = {
       contractor: req.user.id,  // 🔹 contractor filter add kiya
-      isActive: true, 
-      isFilled: false 
+      isActive: true,
+      isFilled: false
     };
 
     if (longitude && latitude) {
@@ -229,12 +233,20 @@ const updateJobPost = async (req, res) => {
     const updateData = {};
     if (title) updateData.title = title;
     if (description) updateData.description = description;
-    if (location) updateData.location = location;
     if (jobTiming) updateData.jobTiming = jobTiming;
     if (skills) updateData.skills = skills;
     if (labourersRequired) updateData.labourersRequired = labourersRequired;
     if (validUntil) updateData.validUntil = validUntilDate;
     if (typeof isActive !== "undefined") updateData.isActive = isActive;
+
+    // ✅ Handle location (coordinates + address)
+    if (location) {
+      updateData.location = {
+        type: "Point",
+        coordinates: location.coordinates || jobPost.location.coordinates,
+        address: location.address || jobPost.location.address,
+      };
+    }
 
     // Update job post
     const updatedJobPost = await JobPost.findByIdAndUpdate(id, updateData, {

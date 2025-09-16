@@ -4,12 +4,8 @@ const nodemailer = require("nodemailer");
 const activeLocks = new Map(); // In-memory store for locks
 const jwt = require("jsonwebtoken");
 const argon2 = require("argon2");
-const twilio = require('twilio');
-const { sendOTPMobile, verifyOTPMobile } = require("../utils/awsSNS");
-
 const Contracter = require("../models/Contracter");
-
-const { validateEmail, validatePassword, validatePhoneNumber, validateName, validatePostalCode } = require('../utils/validator');
+const { getAddressFromCoordinates } = require("../utils/geocoding");
 
 // Function to send OTP (static for now, replace with actual logic)
 const sendOTP = async (req, res) => {
@@ -147,6 +143,12 @@ const roleBasisSignUp = async (req, res) => {
 
     if (lat && lng) {
       user.location = { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] };
+      try {
+        const address = await getAddressFromCoordinates(lat, lng);
+        user.addressLine1 = address; 
+      } catch (err) {
+        console.warn("Reverse geocoding failed:", err.message);
+      }
     }
 
     // ✅ Save uploaded profile picture URL (from S3 middleware)
@@ -159,16 +161,6 @@ const roleBasisSignUp = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
-      data: {
-        firstName,
-        lastName,
-        email,
-        phoneNumber,
-        role: user.role,
-        gender: user.gender,
-        location: user.location,
-        profilePicture: user.profilePicture || null
-      }
     });
   } catch (error) {
     console.error("Signup error:", error);

@@ -28,7 +28,7 @@
     "express-rate-limit": "^7.5.0",
     "express-session": "^1.18.1",
     "firebase": "^12.0.0",
-    "firebase-admin": "^13.4.0",
+    "firebase-admin": "^13.5.0",
     "fs": "^0.0.1-security",
     "http-errors": "^2.0.0",
     "image-size": "^1.1.1",
