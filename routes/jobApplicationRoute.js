@@ -6,7 +6,8 @@ const {
   myApplications,
   getJobApplicationsForContractor,
   updateApplicationStatus,
-  getJobLabourStats
+  getJobLabourStats,
+  // sendJobNotifications
 } = require("../controllers/jobApplicationController");
 
 // Labour applies for a job
@@ -14,6 +15,7 @@ router.post("/apply/:jobId", verifyAllToken(["labour"]), applyJob);
 
 // Get logged-in labour applications
 router.get("/my-applications", verifyAllToken(["labour"]), myApplications);
+// router.get("/send-job-notifications", verifyAllToken(["admin"]), sendJobNotifications);
 
 // Contractor Routes
 router.get("/contractor/applications", verifyAllToken(["contractor"]), getJobApplicationsForContractor);

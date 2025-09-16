@@ -19,6 +19,7 @@ const jobApplicationSchema = new mongoose.Schema(
       default: "applied",
     },
     coverLetter: { type: String }, // optional
+    notificationsSent: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
