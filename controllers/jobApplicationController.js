@@ -1,7 +1,6 @@
 const JobApplication = require("../models/jobApplicationModel");
 const JobPost = require("../models/jobPostModel");
-// const Contractor = require("../models/Contracter");
-// const admin = require("../utils/firebase");
+const User = require("../models/userModel"); 
 
 // Apply for a job (labour side)
 const applyJob = async (req, res) => {
@@ -69,6 +68,35 @@ const applyJob = async (req, res) => {
     });
     if (job.labourersFilled >= job.labourersRequired) job.isFilled = true;
     await job.save();
+    
+    // Send notifications
+    const labour = await User.findById(labourId);
+    const contractor = job.contractor;
+
+    const jobDate = new Date(job.jobTiming);
+    const formattedDate = jobDate.toDateString();
+
+    // Labour notification
+    if (labour.fcmToken) {
+      await sendNotification(
+        labour.fcmToken,
+        "Job Applied Successfully",
+        `You are accepted for job "${job.title}" on ${formattedDate}.`
+      );
+    }
+
+    // Contractor notification
+    if (contractor.fcmToken) {
+      await sendNotification(
+        contractor.fcmToken,
+        "New Labour Accepted",
+        `${labour.firstName} ${labour.lastName} accepted for your job "${job.title}" on ${formattedDate}.`
+      );
+    }
+
+    application.notificationsSent = true;
+    await application.save();
+
 
     return res.status(201).json({
       success: true,
@@ -82,55 +110,6 @@ const applyJob = async (req, res) => {
       .json({ success: false, status: 500, message: "Internal Server Error" });
   }
 };
-
-// Send notifications to contractors for tomorrow's jobs
-// const sendJobNotifications = async (req, res) => {
-//   try {
-//     const tomorrow = new Date();
-//     tomorrow.setDate(tomorrow.getDate() + 1);
-//     tomorrow.setHours(0, 0, 0, 0);
-//     const dayAfterTomorrow = new Date(tomorrow);
-//     dayAfterTomorrow.setDate(tomorrow.getDate() + 1);
-
-//     const applications = await JobApplication.find({ status: "accepted", notificationsSent: false })
-//       .populate("job labour");
-
-//     const notificationsToSend = [];
-
-//     for (let app of applications) {
-//       const jobDate = new Date(app.job.jobTiming); 
-//       if (jobDate >= tomorrow && jobDate < dayAfterTomorrow) {
-//         const contractor = await Contractor.findById(app.job.contractor);
-//         if (contractor.fcmToken) {
-//           const message = {
-//             token: contractor.fcmToken,
-//             notification: {
-//               title: "Labour Availability Notification",
-//               body: `Labour ${app.labour.firstName} ${app.labour.lastName} will be available for job "${app.job.title}" on ${jobDate.toDateString()}.`,
-//             },
-//           };
-//           await admin.messaging().send(message);
-//           notificationsToSend.push({
-//             contractorId: contractor._id,
-//             message: message.notification.body,
-//           });
-//         }
-//         app.notificationsSent = true;
-//         await app.save();
-//       }
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Notifications sent successfully",
-//       notifications: notificationsToSend,
-//     });
-
-//   } catch (err) {
-//     console.error(err);
-//     return res.status(500).json({ success: false, message: "Internal Server Error" });
-//   }
-// };
 
 // Get applications of logged-in labour
 const myApplications = async (req, res) => {

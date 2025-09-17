@@ -465,6 +465,36 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+// Save/Update FCM Token for logged-in user
+const updateFcmToken = async (req, res) => {
+  try {
+    const { fcmToken } = req.body;
+    if (!fcmToken) {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "FCM token is required",
+      });
+    }
+
+    const userId = req.user.id;
+    await User.findByIdAndUpdate(userId, { fcmToken }, { new: true });
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "FCM token updated successfully",
+    });
+  } catch (err) {
+    console.error("Error updating FCM token:", err);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: "Internal Server Error",
+    });
+  }
+};
+
 module.exports = {
   roleBasisSignUp,
   sendEmail,
@@ -472,5 +502,6 @@ module.exports = {
   resetPassword,
   login,
   sendOTP,
-  verifyOtp
+  verifyOtp,
+  updateFcmToken
 }

@@ -19,9 +19,11 @@ const jobApplicationSchema = new mongoose.Schema(
       default: "applied",
     },
     coverLetter: { type: String }, // optional
-    notificationsSent: { type: Boolean, default: false },
+   notifications: {
+  labourNotified: { type: Boolean, default: false },
+  contractorNotified: { type: Boolean, default: false },
+}
   },
   { timestamps: true }
 );
-
 module.exports = mongoose.model("JobApplication", jobApplicationSchema);

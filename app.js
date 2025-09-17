@@ -86,6 +86,9 @@ app.use((obj, req, res, next) => {
   });
 });
 
+// ✅ Load cron jobs
+require("./cron/sendJobReminder");
+
 // Connect to MongoDB and start server
 mongoose.set("strictQuery", false);
 mongoose

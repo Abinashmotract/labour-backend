@@ -6,11 +6,13 @@ const {
     resetPassword,
     login,
     sendOTP,
-    verifyOtp
+    verifyOtp,
+    updateFcmToken
 } = require('../controllers/authController');
 // const { verifyUser, verifyAdmin } = require("../middleware/verifyToken");
 const { uploadToS3 } = require("../config/AWSConfig");
 const rateLimit = require('express-rate-limit');
+const { verifyAllToken } = require("../middleware/verifyToken");
 
 const rateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -31,6 +33,7 @@ const router = express.Router();
 router.post('/labour/signup', uploadToS3, roleBasisSignUp);
 router.post('/labour/verify-otp', verifyOtp);
 router.post('/labour/send-otp', otpRateLimiter, sendOTP);
+router.post("/update-fcmtoken", verifyAllToken(["labour", "contractor"]), updateFcmToken);
 
 // ---------labour--------------
 

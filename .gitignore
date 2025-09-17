@@ -31,3 +31,4 @@ dist/
 # Firebase service account key
 config/firebase-service-account.json
 # config/firebaseConfig.json
+public/labourfirebase.json
