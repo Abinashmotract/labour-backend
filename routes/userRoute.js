@@ -10,6 +10,7 @@ const {
     deleteMultipleUsers,
     uploadProfileImage,
     updateRoleBasisUser,
+    getLabourDetailsById,
 } = require('../controllers/userController');
 const { verifyUser, verifyAdmin, verifyAllToken } = require("../middleware/verifyToken");
 
@@ -21,6 +22,8 @@ router.patch('/update/:id', updateUserProfile);
 router.patch('/update-location', verifyAllToken(['labour']), updateLocation);
 router.post('/profile-image', verifyAllToken(['labour']), uploadProfileImage)
 
+router.get('/labour-details', verifyAllToken(['labour']), getLabourDetailsById);
+
 // admin routes
 router.put('/role/update-user-details', verifyAllToken(['labour', 'contractor']), updateRoleBasisUser);
 router.patch('/admin/update/:id', updateUserProfile);
@@ -29,6 +32,5 @@ router.get('/contractor/all-labour', verifyAllToken(['contractor']), getAllLabou
 router.delete('/admin/delete/:id', verifyAllToken(['admin']), deleteUser);
 router.get('/admin/search-users', verifyAllToken(['admin']), searchUsers);
 router.delete('/admin/multiple/delete', deleteMultipleUsers);
-
 
 module.exports = router;

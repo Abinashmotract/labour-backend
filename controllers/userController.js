@@ -35,6 +35,42 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+// Get single labour details by ID (for contractor side)
+const getLabourDetailsById = async (req, res) => {
+  try {
+    const labourId = req.user.id; // 🔹 token se labour id
+
+    const labour = await User.findOne({
+      _id: labourId,
+      role: "labour",
+    }).select(
+      "-password -refreshToken -otp -otpAttempts -otpFailedAttempts -lastOtpRequest"
+    );
+
+    if (!labour) {
+      return res.status(404).json({
+        success: false,
+        status: 404,
+        message: "Labour not found!",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "Labour details fetched successfully!",
+      data: labour,
+    });
+  } catch (error) {
+    console.error("Get labour details error:", error);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
 // get user by id (labour / contractor)
 const getLoggedInUser = async (req, res) => {
   try {
@@ -115,7 +151,6 @@ const updateRoleBasisUser = async (req, res) => {
     return res.status(500).json({ success: false, status: 500, message: error.message });
   }
 };
-
 
 const updateUserProfile = async (req, res) => {
   try {
@@ -441,6 +476,7 @@ const getAllLabours = async (req, res) => {
 
 module.exports = {
   getAllUsers,
+  getLabourDetailsById,
   getAllLabours,
   updateRoleBasisUser,
   getLoggedInUser,

@@ -150,9 +150,6 @@ const adminCreateUser = async (req, res, next) => {
             return next(createError(400, "Invalid role"));
         }
         let user = await User.findOne({ phoneNumber });
-        // if (user && user.isPhoneVerified) {
-        //     return next(createError(400, "Phone number already registered"));
-        // }
         const otp = "888888"; 
         const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
         if (user) {
