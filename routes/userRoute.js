@@ -1,6 +1,7 @@
 const express = require("express");
 const {
     getAllUsers,
+    getLabourDetailsById,
     getAllLabours,
     getLoggedInUser,
     updateUserProfile,
@@ -19,7 +20,9 @@ const router = express.Router();
 router.get('/me', verifyAllToken(['labour', 'contractor']), getLoggedInUser);
 router.patch('/update/:id', updateUserProfile);
 router.patch('/update-location', verifyAllToken(['labour']), updateLocation);
-router.post('/profile-image', verifyAllToken(['labour']), uploadProfileImage)
+router.post('/profile-image', verifyAllToken(['labour']), uploadProfileImage);
+
+router.get('/labour-details', verifyAllToken(['labour']), getLabourDetailsById);
 
 // admin routes
 router.put('/role/update-user-details', verifyAllToken(['labour', 'contractor']), updateRoleBasisUser);
