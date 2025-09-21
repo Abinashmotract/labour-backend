@@ -1,4 +1,3 @@
-// utils/firebase.js (backend)
 const admin = require("firebase-admin");
 
 admin.initializeApp({
