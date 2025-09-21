@@ -35,7 +35,10 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+<<<<<<< HEAD
 // Get single labour details by ID (for contractor side)
+=======
+>>>>>>> 907f0f8644bf8ea4505471b22f5be4064ac79c7a
 const getLabourDetailsById = async (req, res) => {
   try {
     const labourId = req.user.id; // 🔹 token se labour id
