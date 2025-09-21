@@ -32,3 +32,4 @@ dist/
 config/firebase-service-account.json
 # config/firebaseConfig.json
 config/labourfirebase.json
+.env
