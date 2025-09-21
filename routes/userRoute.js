@@ -11,7 +11,6 @@ const {
     deleteMultipleUsers,
     uploadProfileImage,
     updateRoleBasisUser,
-    getLabourDetailsById,
 } = require('../controllers/userController');
 const { verifyUser, verifyAdmin, verifyAllToken } = require("../middleware/verifyToken");
 
