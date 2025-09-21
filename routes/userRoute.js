@@ -25,8 +25,6 @@ router.post('/profile-image', verifyAllToken(['labour']), uploadProfileImage);
 
 router.get('/labour-details', verifyAllToken(['labour']), getLabourDetailsById);
 
-router.get('/labour-details', verifyAllToken(['labour']), getLabourDetailsById);
-
 // admin routes
 router.put('/role/update-user-details', verifyAllToken(['labour', 'contractor']), updateRoleBasisUser);
 router.patch('/admin/update/:id', updateUserProfile);
