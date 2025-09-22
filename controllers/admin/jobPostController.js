@@ -160,7 +160,6 @@ const getContractorJobs = async (req, res) => {
   }
 };
 
-
 // Update Job Post
 const updateJobPost = async (req, res) => {
   try {

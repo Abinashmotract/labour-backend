@@ -150,7 +150,7 @@ const adminCreateUser = async (req, res, next) => {
             return next(createError(400, "Invalid role"));
         }
         let user = await User.findOne({ phoneNumber });
-        const otp = "888888"; 
+        const otp = "888888";
         const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
         if (user) {
             user.firstName = firstName;
@@ -159,6 +159,9 @@ const adminCreateUser = async (req, res, next) => {
             user.role = role;
             user.otp = otp;
             user.otpExpiry = otpExpiry;
+            if (role === "contractor") {
+                user.isAgent = false;
+            }
         } else {
             user = new User({
                 firstName,
@@ -169,7 +172,8 @@ const adminCreateUser = async (req, res, next) => {
                 otp,
                 otpExpiry,
                 isPhoneVerified: false,
-                createdByAdmin: true 
+                createdByAdmin: true,
+                isAgent: role === "contractor" ? false : undefined,
             });
         }
         await user.save();

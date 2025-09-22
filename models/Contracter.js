@@ -11,6 +11,7 @@ const contracterSchema = new mongoose.Schema(
         profilePicture: { type: String, default: "", },
         gender: { type: String, enum: ["male", "female", "other"], default: "other", },
         role: { type: String, enum: ["labour", "contractor", "admin"], default: "contractor", },
+        isAgent: { type: Boolean, default: false },
         profileCompletionStep: { type: String, default: "personalInfo", },
         fcmToken: { type: String, default: "" },
     },
@@ -18,5 +19,4 @@ const contracterSchema = new mongoose.Schema(
         timestamps: true, // adds createdAt and updatedAt
     }
 );
-
 module.exports = mongoose.model("Contracter", contracterSchema);

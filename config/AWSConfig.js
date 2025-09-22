@@ -122,5 +122,3 @@ const uploadToS3 = (req, res, next) => {
 module.exports = { uploadToS3 };
 
 
-module.exports = { uploadToS3 };
-

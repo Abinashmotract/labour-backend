@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const User = require("../models/userModel");
+const Contracter = require("../models/Contracter");
 const { getAddressFromCoordinates } = require("../utils/geocoding");
 
 // get users
@@ -34,6 +35,35 @@ const getAllUsers = async (req, res) => {
     });
   }
 };
+
+const toggleContractorAgent = async (req, res) => {
+  try {
+    const contractorId = req.params.id;
+
+    const contractor = await Contracter.findOne({ _id: contractorId, role: "contractor" });
+    if (!contractor) {
+      return res.status(404).json({
+        success: false,
+        status: 404,
+        message: "Contractor not found!",
+      });
+    }
+    contractor.isAgent = !contractor.isAgent;
+    await contractor.save();
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: `Contractor agent status updated: ${contractor.isAgent}`
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
 
 const getLabourDetailsById = async (req, res) => {
   try {
@@ -475,6 +505,7 @@ const getAllLabours = async (req, res) => {
 
 module.exports = {
   getAllUsers,
+  toggleContractorAgent,
   getLabourDetailsById,
   getAllLabours,
   updateRoleBasisUser,
