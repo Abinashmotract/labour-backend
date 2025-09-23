@@ -322,7 +322,7 @@ const getNearbyJobs = async (req, res) => {
   try {
     const { longitude, latitude, maxDistance = 15000 } = req.query; // 15km default
     const labourId = req.user.id;
-    const labourSkills = req.user.skills || [];
+    // const labourSkills = req.user.skills || [];
 
     if (!longitude || !latitude) {
       return res.status(400).json({
@@ -352,7 +352,7 @@ const getNearbyJobs = async (req, res) => {
           isActive: true,
           isFilled: false,
           validUntil: { $gt: currentDate },
-          skills: { $in: labourSkills },
+          // skills: { $in: labourSkills },
         },
       },
       {
