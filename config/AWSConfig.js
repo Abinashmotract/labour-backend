@@ -11,7 +11,6 @@ const upload = multer({
     }
 });
 
-// ✅ Correct: define upload middleware for multiple fields
 const uploadToS3 = (req, res, next) => {
     const uploader = upload.fields([
         { name: 'profilePicture', maxCount: 1 },

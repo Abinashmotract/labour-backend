@@ -95,8 +95,6 @@ const toggleContractorAgent = async (req, res) => {
 const getLaboursByAgent = async (req, res) => {
   try {
     const agentId = req.params.agentId;
-
-    // Validate agent exists and is an agent
     const agent = await User.findOne({ _id: agentId, isAgent: true, role: "contractor" });
     if (!agent) {
       return res.status(404).json({
@@ -105,8 +103,6 @@ const getLaboursByAgent = async (req, res) => {
         message: "Agent not found",
       });
     }
-
-    // Find all labours referred by this agent
     const labours = await User.find({ referredBy: agentId, role: "labour" })
       .select("-password -otp -otpExpiry");
 
