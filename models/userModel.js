@@ -16,6 +16,7 @@ const UserSchema = new Schema(
     work_category: { type: String },
     password: { type: String },
     profilePicture: { type: String, default: "" },
+    isAgent: { type: Boolean, default: false },
     role: { type: String, enum: ["labour", "contractor", "admin"], default: "labour" },
     location: {
       type: { type: String, enum: ["Point"], default: "Point" },
@@ -25,6 +26,5 @@ const UserSchema = new Schema(
   },
   { timestamps: true }
 );
-
 UserSchema.index({ location: "2dsphere" }); // ✅ for geo-queries
 module.exports = mongoose.model('labour', UserSchema);

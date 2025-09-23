@@ -115,22 +115,14 @@ const roleBasisSignUp = async (req, res) => {
       lat,
       lng
     } = req.body;
-
-    // Find user by phone number
     const user = await User.findOne({ phoneNumber });
-
     if (!user || !user.isPhoneVerified) {
       return res.status(400).json({ success: false, message: "Phone not verified" });
     }
-
     if (user.email) {
       return res.status(400).json({ success: false, message: "User already registered" });
     }
-
-    // Hash password
     const hashedPassword = await argon2.hash(password);
-
-    // Update user details
     user.firstName = firstName;
     user.lastName = lastName;
     user.email = email.toLowerCase();
@@ -140,24 +132,27 @@ const roleBasisSignUp = async (req, res) => {
     user.work_experience = work_experience;
     user.gender = gender;
     user.role = role; // labour / contractor
+    user.isAgent = req.body.isAgent || false;
+    if (role === "contractor") {
+      user.isAgent = req.body.isAgent || false;
+    } else {
+      user.isAgent = undefined; // ya delete user.isAgent;
+    }
 
     if (lat && lng) {
       user.location = { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] };
       try {
         const address = await getAddressFromCoordinates(lat, lng);
-        user.addressLine1 = address; 
+        user.addressLine1 = address;
       } catch (err) {
         console.warn("Reverse geocoding failed:", err.message);
       }
     }
-
     // ✅ Save uploaded profile picture URL (from S3 middleware)
     if (req.fileLocations && req.fileLocations.profilePicture) {
       user.profilePicture = req.fileLocations.profilePicture;
     }
-
     await user.save();
-
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
