@@ -27,11 +27,3 @@ dist/
 *.njsproj
 *.sln
 *.csproj
-
-# Firebase service account key
-config/firebase-service-account.json
-# config/firebaseConfig.json
-config/labourfirebase.json
-.env
-labour-1ae3e-firebase-adminsdk-fbsvc-6e8c9ece64.json
-*.json
