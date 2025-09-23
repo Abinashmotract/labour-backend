@@ -115,28 +115,67 @@ const applyJob = async (req, res) => {
 const myApplications = async (req, res) => {
   try {
     const labourId = req.user.id;
-    const applications = await JobApplication.find({
-      labour: labourId,
-    }).populate({
-      path: "job",
-      select:
-        "title description location jobTiming labourersRequired labourersFilled isFilled validUntil skills",
-      populate: {
-        path: "skills",
-        select: "name",
-      },
+    const applications = await JobApplication.find({ labour: labourId })
+      .populate({
+        path: "job",
+        select:
+          "title description location jobTiming labourersRequired labourersFilled isFilled skills contractor",
+        populate: [
+          { path: "skills", select: "name" },
+          { path: "contractor", select: "firstName lastName email phoneNumber" }
+        ],
+      })
+      .sort({ createdAt: -1 });
+    const history = applications.map(app => {
+      if (!app.job) {
+        return {
+          applicationId: app._id,
+          status: app.status,
+          appliedAt: app.createdAt,
+          coverLetter: app.coverLetter || "",
+          job: null
+        };
+      }
+
+      return {
+        applicationId: app._id,
+        status: app.status,
+        appliedAt: app.createdAt,
+        coverLetter: app.coverLetter || "",
+        job: {
+          jobId: app.job._id,
+          title: app.job.title,
+          description: app.job.description,
+          location: app.job.location,
+          jobTiming: app.job.jobTiming,
+          labourersRequired: app.job.labourersRequired,
+          labourersFilled: app.job.labourersFilled,
+          isFilled: app.job.isFilled,
+          skills: app.job.skills?.map(s => s.name) || [],
+          contractor: app.job.contractor
+            ? {
+                id: app.job.contractor._id,
+                firstName: app.job.contractor.firstName,
+                lastName: app.job.contractor.lastName,
+                email: app.job.contractor.email,
+                phoneNumber: app.job.contractor.phoneNumber
+              }
+            : null
+        }
+      };
     });
 
     return res.status(200).json({
       success: true,
-      message: "Applications fetched successfully",
-      data: applications,
+      message: "Job applications fetched successfully",
+      data: history
     });
   } catch (err) {
     console.error("Error in myApplications:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal Server Error" });
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error"
+    });
   }
 };
 
