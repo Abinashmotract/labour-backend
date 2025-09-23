@@ -39,8 +39,7 @@ const getAllUsers = async (req, res) => {
 const toggleContractorAgent = async (req, res) => {
   try {
     const contractorId = req.params.id;
-
-    const contractor = await Contracter.findOne({ _id: contractorId, role: "contractor" });
+    const contractor = await User.findOne({ _id: contractorId, role: "contractor" });
     if (!contractor) {
       return res.status(404).json({
         success: false,
@@ -53,9 +52,11 @@ const toggleContractorAgent = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: `Contractor agent status updated: ${contractor.isAgent}`
+      message: `Contractor agent status updated: ${contractor.isAgent}`,
+      data: contractor
     });
   } catch (error) {
+    console.error("toggleContractorAgent error:", error);
     return res.status(500).json({
       success: false,
       status: 500,
@@ -63,7 +64,6 @@ const toggleContractorAgent = async (req, res) => {
     });
   }
 };
-
 
 const getLabourDetailsById = async (req, res) => {
   try {
@@ -100,7 +100,6 @@ const getLabourDetailsById = async (req, res) => {
   }
 };
 
-// get user by id (labour / contractor)
 const getLoggedInUser = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -214,7 +213,6 @@ const updateUserProfile = async (req, res) => {
   }
 };
 
-// delete user
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -242,7 +240,6 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// PATCH /api/users/location
 const updateLocation = async (req, res) => {
   try {
     const { longitude, latitude } = req.body;
