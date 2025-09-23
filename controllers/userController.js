@@ -10,7 +10,7 @@ async function generateUniqueReferralCode(prefix = "AGT", length = 6) {
   let code = "";
   let exists = true;
   while (exists) {
-    code = prefix + "-" + Array.from({length}).map(() => chars[Math.floor(Math.random()*chars.length)]).join("");
+    code = prefix + "-" + Array.from({ length }).map(() => chars[Math.floor(Math.random() * chars.length)]).join("");
     exists = await User.exists({ referralCode: code });
   }
   return code;
@@ -94,16 +94,15 @@ const toggleContractorAgent = async (req, res) => {
 };
 const getLaboursByAgent = async (req, res) => {
   try {
-    const agentId = req.user._id;
+    const agentId = req.params.agentId;
 
-    // Fetch fresh user data
-    const agent = await User.findById(agentId);
-
-    if (!agent || agent.role !== "contractor" || !agent.isAgent) {
-      return res.status(403).json({
+    // Validate agent exists and is an agent
+    const agent = await User.findOne({ _id: agentId, isAgent: true, role: "contractor" });
+    if (!agent) {
+      return res.status(404).json({
         success: false,
-        status: 403,
-        message: "Access denied. Only contractor agents can access this list.",
+        status: 404,
+        message: "Agent not found",
       });
     }
 
@@ -114,7 +113,7 @@ const getLaboursByAgent = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: `Labours referred by you fetched successfully`,
+      message: `Labours referred by agent ${agent.firstName} fetched successfully`,
       data: labours,
     });
 
