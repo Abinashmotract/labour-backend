@@ -36,7 +36,7 @@ router.delete('/admin/delete/:id', verifyAllToken(['admin']), deleteUser);
 router.get('/admin/search-users', verifyAllToken(['admin']), searchUsers);
 router.delete('/admin/multiple/delete', deleteMultipleUsers);
 
-router.get("/agent/labours", verifyAllToken(['contractor']), getLaboursByAgent);
+router.get("/agent/:agentId/labours", getLaboursByAgent);
 
 
 
