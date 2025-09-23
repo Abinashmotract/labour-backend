@@ -3,6 +3,19 @@ const User = require("../models/userModel");
 const Contracter = require("../models/Contracter");
 const { getAddressFromCoordinates } = require("../utils/geocoding");
 
+
+// Utility: generate unique referral code
+async function generateUniqueReferralCode(prefix = "AGT", length = 6) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "";
+  let exists = true;
+  while (exists) {
+    code = prefix + "-" + Array.from({length}).map(() => chars[Math.floor(Math.random()*chars.length)]).join("");
+    exists = await User.exists({ referralCode: code });
+  }
+  return code;
+}
+
 // get users
 const getAllUsers = async (req, res) => {
   try {
@@ -47,7 +60,22 @@ const toggleContractorAgent = async (req, res) => {
         message: "Contractor not found!",
       });
     }
+
     contractor.isAgent = !contractor.isAgent;
+
+    // If toggling ON to agent, generate referralCode if not already present
+    if (contractor.isAgent && !contractor.referralCode) {
+      try {
+        const code = await generateUniqueReferralCode();
+        contractor.referralCode = code;
+      } catch (err) {
+        console.error("Referral code generation failed:", err);
+        // don't block the toggle - still save without code (or you might return error)
+      }
+    }
+
+    // optional: if toggling off, you might want to keep referralCode or clear it.
+    // currently we keep it (so old referrals still refer to same code).
     await contractor.save();
     return res.status(200).json({
       success: true,
@@ -57,6 +85,41 @@ const toggleContractorAgent = async (req, res) => {
     });
   } catch (error) {
     console.error("toggleContractorAgent error:", error);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+const getLaboursByAgent = async (req, res) => {
+  try {
+    const agentId = req.user._id;
+
+    // Fetch fresh user data
+    const agent = await User.findById(agentId);
+
+    if (!agent || agent.role !== "contractor" || !agent.isAgent) {
+      return res.status(403).json({
+        success: false,
+        status: 403,
+        message: "Access denied. Only contractor agents can access this list.",
+      });
+    }
+
+    // Find all labours referred by this agent
+    const labours = await User.find({ referredBy: agentId, role: "labour" })
+      .select("-password -otp -otpExpiry");
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: `Labours referred by you fetched successfully`,
+      data: labours,
+    });
+
+  } catch (error) {
+    console.error("getLaboursByAgent error:", error);
     return res.status(500).json({
       success: false,
       status: 500,
@@ -513,4 +576,5 @@ module.exports = {
   searchUsers,
   deleteMultipleUsers,
   uploadProfileImage,
+  getLaboursByAgent
 };

@@ -113,7 +113,8 @@ const roleBasisSignUp = async (req, res) => {
       gender,
       role,
       lat,
-      lng
+      lng,
+      referralCode
     } = req.body;
     const user = await User.findOne({ phoneNumber });
     if (!user || !user.isPhoneVerified) {
@@ -137,6 +138,26 @@ const roleBasisSignUp = async (req, res) => {
       user.isAgent = req.body.isAgent || false;
     } else {
       user.isAgent = undefined; // ya delete user.isAgent;
+    }
+    // Handle referral code: only for labour signup
+    if (role === "labour" && referralCode) {
+      try {
+        const agent = await User.findOne({ referralCode: referralCode, isAgent: true, role: "contractor" });
+        if (agent) {
+          // only set referredBy and increment if labour didn't already have one
+          if (!user.referredBy) {
+            user.referredBy = agent._id;
+            // increment agent count
+            agent.referralsCount = (agent.referralsCount || 0) + 1;
+            await agent.save();
+          }
+        } else {
+          // If referral code invalid, we don't block signup; optionally send warning to client
+          console.warn("Invalid referral code used during signup:", referralCode);
+        }
+      } catch (err) {
+        console.warn("Referral handling failed:", err);
+      }
     }
 
     if (lat && lng) {
