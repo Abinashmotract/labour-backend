@@ -350,6 +350,58 @@ const getJobLabourStats = async (req, res) => {
   }
 };
 
+// Contractor: Dashboard job stats
+const getContractorJobStats = async (req, res) => {
+  try {
+    const contractorId = req.user.id;
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Fetch all jobs created by contractor
+    const totalJobs = await JobPost.countDocuments({ contractor: contractorId });
+
+    // In-progress jobs → active, not filled, and still valid
+    const inProgress = await JobPost.countDocuments({
+      contractor: contractorId,
+      isActive: true,
+      isFilled: false,
+      validUntil: { $gte: new Date() },
+    });
+    const completed = await JobPost.countDocuments({
+      contractor: contractorId,
+      $or: [
+        { isFilled: true },
+        { validUntil: { $lt: new Date() } },
+      ],
+    });
+    const todayRequested = await JobPost.countDocuments({
+      contractor: contractorId,
+      createdAt: { $gte: todayStart, $lte: todayEnd },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Contractor job stats fetched successfully",
+      data: {
+        totalJobs,
+        inProgress,
+        completed,
+        todayRequested,
+      },
+    });
+  } catch (error) {
+    console.error("Error in getContractorJobStats:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+
 module.exports = {
   applyJob,
   // sendJobNotifications,
@@ -357,4 +409,5 @@ module.exports = {
   getJobApplicationsForContractor,
   updateApplicationStatus,
   getJobLabourStats,
+  getContractorJobStats
 };
