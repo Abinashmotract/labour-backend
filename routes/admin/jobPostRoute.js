@@ -12,6 +12,6 @@ router.get("/nearby-jobs", verifyAllToken(["labour", "admin"]), getNearbyJobs);
 router.get("/all-contractor-jobs", verifyAllToken(["contractor"]), getContractorJobs);
 
 // Get all job posts (public / labour can see)
-router.get("/all-jobs", getAllJobPosts);
+router.get("/all-jobs", verifyAllToken(["contractor"]), getAllJobPosts);
 
 module.exports = router;

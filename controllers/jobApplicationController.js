@@ -401,7 +401,6 @@ const getContractorJobStats = async (req, res) => {
   }
 };
 
-
 module.exports = {
   applyJob,
   // sendJobNotifications,
