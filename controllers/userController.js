@@ -92,6 +92,7 @@ const toggleContractorAgent = async (req, res) => {
     });
   }
 };
+
 const getLaboursByAgent = async (req, res) => {
   try {
     const agentId = req.params.agentId;
@@ -190,7 +191,20 @@ const getLoggedInUser = async (req, res) => {
 
 const updateRoleBasisUser = async (req, res) => {
   try {
-    const { userId, firstName, lastName, email, addressLine1, work_category, work_experience, gender } = req.body;
+    const {
+      userId,
+      firstName,
+      lastName,
+      email,
+      addressLine1,
+      work_category,
+      work_experience,
+      gender,
+      isAgent,        // allow update
+      referralCode,   // optional
+      lat,
+      lng
+    } = req.body;
 
     if (!userId) {
       return res.status(400).json({ success: false, status: 400, message: "User ID is required" });
@@ -198,6 +212,7 @@ const updateRoleBasisUser = async (req, res) => {
 
     let user = await User.findById(userId);
     if (!user) return res.status(404).json({ success: false, status: 404, message: "User not found" });
+
     if (!["labour", "contractor"].includes(user.role)) {
       return res.status(403).json({ success: false, status: 403, message: "Only labour/contractor users can be updated here" });
     }
@@ -209,16 +224,35 @@ const updateRoleBasisUser = async (req, res) => {
     if (work_experience) user.work_experience = work_experience;
     if (gender) user.gender = gender;
 
-    // ✅ Update address and coordinates from typed address
-    if (addressLine1) {
-      try {
-        const geo = await getAddressFromCoordinates(addressLine1);
-        user.location = { type: "Point", coordinates: [geo.longitude, geo.latitude] };
-        user.addressLine1 = geo.formattedAddress; // store formatted address
-      } catch (err) {
-        console.warn("Geocoding failed:", err.message);
-        user.addressLine1 = addressLine1; // fallback
+    // ✅ Update agent status only if contractor
+    if (user.role === "contractor") {
+      if (typeof isAgent !== "undefined") {
+        user.isAgent = isAgent;
       }
+    }
+
+    // ✅ Handle referralCode (only labour)
+    if (user.role === "labour" && referralCode) {
+      const agent = await User.findOne({ referralCode, isAgent: true, role: "contractor" });
+      if (agent && !user.referredBy) {
+        user.referredBy = agent._id;
+        agent.referralsCount = (agent.referralsCount || 0) + 1;
+        await agent.save();
+      }
+    }
+
+    // ✅ Update location (lat/lng preferred)
+    if (lat && lng) {
+      user.location = { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] };
+      try {
+        const address = await getAddressFromCoordinates(lat, lng);
+        user.addressLine1 = address;
+      } catch (err) {
+        console.warn("Reverse geocoding failed:", err.message);
+      }
+    } else if (addressLine1) {
+      // fallback if only address is given
+      user.addressLine1 = addressLine1;
     }
 
     if (req.fileLocations?.profilePicture) {
@@ -231,6 +265,7 @@ const updateRoleBasisUser = async (req, res) => {
       success: true,
       status: 200,
       message: "User updated successfully",
+      data: user,
     });
   } catch (error) {
     console.error("Update role basis user error:", error);

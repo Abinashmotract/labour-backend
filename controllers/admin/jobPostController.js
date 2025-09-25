@@ -1,5 +1,6 @@
 const JobPost = require("../../models/jobPostModel");
 const Skill = require("../../models/skillModel");
+const { sendJobNotificationToAllLabours, sendJobNotificationToNearbyLabours } = require("../../service/notificationService");
 
 // Create Job Post (Admin)
 const createJobPost = async (req, res) => {
@@ -41,6 +42,7 @@ const createJobPost = async (req, res) => {
         message: "Valid coordinates are required",
       });
     }
+
     const jobPost = new JobPost({
       title,
       description,
@@ -51,7 +53,21 @@ const createJobPost = async (req, res) => {
       labourersRequired,
       validUntil: new Date(validUntil),
     });
+
     await jobPost.save();
+    
+    // ✅ Populate job data for notification
+    const populatedJob = await JobPost.findById(jobPost._id)
+      .populate('contractor', 'firstName lastName')
+      .populate('skills', 'name');
+    try {
+      await sendJobNotificationToAllLabours(populatedJob);
+      await sendJobNotificationToNearbyLabours(populatedJob, 50000); 
+    } catch (notificationError) {
+      console.error('Notification sending failed:', notificationError);
+      // Don't fail the main request if notification fails
+    }
+
     return res.status(201).json({
       success: true,
       message: "Job post created successfully",
@@ -69,7 +85,13 @@ const createJobPost = async (req, res) => {
 const getAllJobPosts = async (req, res) => {
   try {
     const { showExpired, longitude, latitude, maxDistance = 15000 } = req.query;
+
     let filter = { isActive: true, isFilled: false };
+    // ✅ If logged-in user is a contractor, show only their jobs
+    if (req.user.role === "contractor") {
+      filter.contractor = req.user.id;
+    }
+
     if (longitude && latitude) {
       const userLongitude = parseFloat(longitude);
       const userLatitude = parseFloat(latitude);

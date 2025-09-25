@@ -139,20 +139,16 @@ const roleBasisSignUp = async (req, res) => {
     } else {
       user.isAgent = undefined; // ya delete user.isAgent;
     }
-    // Handle referral code: only for labour signup
     if (role === "labour" && referralCode) {
       try {
         const agent = await User.findOne({ referralCode: referralCode, isAgent: true, role: "contractor" });
         if (agent) {
-          // only set referredBy and increment if labour didn't already have one
           if (!user.referredBy) {
             user.referredBy = agent._id;
-            // increment agent count
             agent.referralsCount = (agent.referralsCount || 0) + 1;
             await agent.save();
           }
         } else {
-          // If referral code invalid, we don't block signup; optionally send warning to client
           console.warn("Invalid referral code used during signup:", referralCode);
         }
       } catch (err) {
@@ -187,7 +183,7 @@ const roleBasisSignUp = async (req, res) => {
 // login user
 const login = async (req, res, next) => {
   try {
-    const { phoneNumber, password, longitude, latitude, role } = req.body;
+    const { phoneNumber, password, longitude, latitude, role, fcmToken } = req.body;
     if (!phoneNumber) {
       return res.status(400).json({
         success: false,
@@ -239,6 +235,12 @@ const login = async (req, res, next) => {
       };
       await account.save();
     }
+    // ✅ FCM Token update (NEW)
+    if (fcmToken) {
+      account.fcmToken = fcmToken;
+      console.log(`FCM token updated for ${role}: ${phoneNumber}`);
+    }
+
     const token = jwt.sign(
       { id: account._id, phoneNumber: account.phoneNumber, role: account.role },
       process.env.JWT_SECRET,
@@ -260,7 +262,8 @@ const login = async (req, res, next) => {
       token,
       refreshToken: accountData.refreshToken,
       role: accountData.role,
-      phoneNumber: accountData.phoneNumber
+      phoneNumber: accountData.phoneNumber,
+      fcmTokenUpdated: !!fcmToken
     });
 
   } catch (error) {
@@ -492,10 +495,8 @@ const updateFcmToken = async (req, res) => {
         message: "FCM token is required",
       });
     }
-
     const userId = req.user.id;
     await User.findByIdAndUpdate(userId, { fcmToken }, { new: true });
-
     return res.status(200).json({
       success: true,
       status: 200,
