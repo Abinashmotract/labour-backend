@@ -1,6 +1,7 @@
 const JobApplication = require("../models/jobApplicationModel");
 const JobPost = require("../models/jobPostModel");
 const User = require("../models/userModel"); 
+const { sendNotification } = require("../utils/notifications");
 
 // Apply for a job (labour side)
 const applyJob = async (req, res) => {
@@ -11,7 +12,7 @@ const applyJob = async (req, res) => {
 
     const job = await JobPost.findById(jobId).populate(
       "contractor",
-      "firstName lastName email phoneNumber"
+      "firstName lastName email phoneNumber fcmToken"
     );
     if (!job) {
       return res
