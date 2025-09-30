@@ -512,7 +512,7 @@ const deleteMultipleUsers = async (req, res) => {
 const uploadProfileImage = async (req, res) => {
   try {
     const id = req.query.id ? req.query.id : req.user.id;
-    const fileUrl = req.fileLocations;
+    const fileUrl = req.fileLocations?.profilePicture;
 
     const user = await User.findById(id);
     if (!user) {
@@ -523,7 +523,7 @@ const uploadProfileImage = async (req, res) => {
       });
     }
 
-    user.profileImage = fileUrl || " ";
+    user.profilePicture = fileUrl || "";
     await user.save();
 
     res.status(200).json({
