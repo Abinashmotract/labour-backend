@@ -8,10 +8,10 @@ const {
   markAllAsRead,
   getNotificationStats
 } = require('../controllers/notificationController');
-const verifyToken = require('../middleware/verifyToken');
+const { verifyUser } = require('../middleware/verifyToken');
 
 // Apply authentication middleware to all routes
-router.use(verifyToken);
+router.use(verifyUser);
 
 // Get all notifications for the authenticated user
 router.get('/', getAllNotifications);
