@@ -330,7 +330,7 @@ const searchUsers = async (req, res) => {
       location,
       minRating,
       maxRating,
-      date, // 👈 added
+      date,
       sortBy = "createdAt",
       sortOrder = "desc",
       page = 1,
@@ -375,7 +375,6 @@ const searchUsers = async (req, res) => {
       };
     }
 
-    // ⏱️ Sorting
     const sortOptions = {};
     const validSortFields = ["rating", "lastLogin", "createdAt"];
     if (validSortFields.includes(sortBy)) {
