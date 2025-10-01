@@ -7,7 +7,13 @@ if (!admin.apps.length) {
 
     // Preferred: full JSON in FIREBASE_CONFIG
     if (process.env.FIREBASE_CONFIG) {
-      serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
+      try {
+        serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
+      } catch (error) {
+        console.error('Error parsing FIREBASE_CONFIG JSON:', error.message);
+        console.error('FIREBASE_CONFIG value (first 100 chars):', process.env.FIREBASE_CONFIG.substring(0, 100));
+        throw new Error(`Invalid JSON in FIREBASE_CONFIG: ${error.message}`);
+      }
     } else if (
       process.env.FIREBASE_PROJECT_ID &&
       process.env.FIREBASE_CLIENT_EMAIL &&
@@ -21,8 +27,13 @@ if (!admin.apps.length) {
       };
     } else if (process.env.FIREBASE_CONFIG_BASE64) {
       // Base64-encoded full JSON
-      const json = Buffer.from(process.env.FIREBASE_CONFIG_BASE64, 'base64').toString('utf8');
-      serviceAccount = JSON.parse(json);
+      try {
+        const json = Buffer.from(process.env.FIREBASE_CONFIG_BASE64, 'base64').toString('utf8');
+        serviceAccount = JSON.parse(json);
+      } catch (error) {
+        console.error('Error parsing FIREBASE_CONFIG_BASE64:', error.message);
+        throw new Error(`Invalid JSON in FIREBASE_CONFIG_BASE64: ${error.message}`);
+      }
     } else if (process.env.FIREBASE_PRIVATE_KEY_BASE64 && process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL) {
       // Base64-encoded private key with separate fields
       const privateKey = Buffer.from(process.env.FIREBASE_PRIVATE_KEY_BASE64, 'base64').toString('utf8');
