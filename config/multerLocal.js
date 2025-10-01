@@ -34,7 +34,8 @@ const uploadToLocal = (req, res, next) => {
 
     req.fileLocations = req.fileLocations || {};
     if (req.file && req.file.filename) {
-      req.fileLocations.profilePicture = `/uploads/${req.file.filename}`;
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      req.fileLocations.profilePicture = `${baseUrl}/uploads/${req.file.filename}`;
     }
     next();
   });
