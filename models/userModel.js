@@ -23,6 +23,10 @@ const UserSchema = new Schema(
       coordinates: { type: [Number], default: [0, 0] } 
     },
     fcmToken: { type: String },
+    skills: [{
+      type: Schema.Types.ObjectId,
+      ref: 'Skill'
+    }],
     // --- new referral fields ---
     referralCode: { type: String, unique: true, sparse: true }, // only agents will have
     referralsCount: { type: Number, default: 0 }, // how many labours referred to this agent

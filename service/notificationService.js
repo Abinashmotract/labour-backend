@@ -6,14 +6,29 @@ const sendJobNotificationToAllLabours = async (jobData) => {
   try {
     console.log('Sending job notification to all labours...');
     
-    // Get all labour users with FCM tokens
-    const labours = await User.find({ 
+    // Get job skills
+    const jobSkills = jobData.skills ? jobData.skills.map(skill => skill._id || skill) : [];
+    console.log('Job skills:', jobSkills);
+    
+    // Build query for labours with matching skills
+    let query = { 
       role: 'labour', 
       fcmToken: { $exists: true, $ne: null } 
-    }).select('fcmToken firstName');
+    };
+    
+    // If job has skills, only notify labours with matching skills
+    if (jobSkills.length > 0) {
+      query.skills = { $in: jobSkills };
+      console.log('Filtering labours by skills:', jobSkills);
+    } else {
+      console.log('No skills specified, notifying all labours');
+    }
+    
+    // Get labour users with FCM tokens and matching skills
+    const labours = await User.find(query).select('fcmToken firstName skills');
     
     if (labours.length === 0) {
-      console.log('No labours with FCM tokens found');
+      console.log('No labours with FCM tokens and matching skills found');
       return;
     }
 
@@ -34,7 +49,7 @@ const sendJobNotificationToAllLabours = async (jobData) => {
         type: 'NEW_JOB_POST',
         title: jobData.title,
         description: jobData.description,
-        contractorId: jobData.contractor.toString()
+        contractorId: jobData.contractor ? jobData.contractor.toString() : 'unknown'
       },
       tokens: fcmTokens, // Send to multiple tokens
     };
@@ -70,8 +85,12 @@ const sendJobNotificationToNearbyLabours = async (jobData, maxDistance = 50000) 
 
     const [longitude, latitude] = jobData.location.coordinates;
     
-    // Find labours within specified distance
-    const nearbyLabours = await User.find({
+    // Get job skills
+    const jobSkills = jobData.skills ? jobData.skills.map(skill => skill._id || skill) : [];
+    console.log('Job skills for nearby search:', jobSkills);
+    
+    // Build query for nearby labours with matching skills
+    let query = {
       role: 'labour',
       fcmToken: { $exists: true, $ne: null },
       location: {
@@ -83,10 +102,21 @@ const sendJobNotificationToNearbyLabours = async (jobData, maxDistance = 50000) 
           $maxDistance: maxDistance
         }
       }
-    }).select('fcmToken firstName');
+    };
+    
+    // If job has skills, only notify labours with matching skills
+    if (jobSkills.length > 0) {
+      query.skills = { $in: jobSkills };
+      console.log('Filtering nearby labours by skills:', jobSkills);
+    } else {
+      console.log('No skills specified, notifying all nearby labours');
+    }
+    
+    // Find labours within specified distance with matching skills
+    const nearbyLabours = await User.find(query).select('fcmToken firstName skills');
 
     if (nearbyLabours.length === 0) {
-      console.log('No nearby labours with FCM tokens found');
+      console.log('No nearby labours with FCM tokens and matching skills found');
       return;
     }
 
