@@ -273,38 +273,6 @@ const updateRoleBasisUser = async (req, res) => {
   }
 };
 
-const updateUserProfile = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const updateData = req.body;
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      { $set: updateData },
-      { new: true }
-    );
-    if (!updatedUser) {
-      return res.status(404).json({
-        success: false,
-        status: 404,
-        message: "User not updated!",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      status: 200,
-      message: "User updated succcesfully!",
-      data: updatedUser,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      status: 500,
-      message: error.message,
-    });
-  }
-};
 
 const deleteUser = async (req, res) => {
   try {
@@ -600,7 +568,6 @@ module.exports = {
   getAllLabours,
   updateRoleBasisUser,
   getLoggedInUser,
-  updateUserProfile,
   deleteUser,
   updateLocation,
   searchUsers,
