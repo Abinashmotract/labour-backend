@@ -6,7 +6,6 @@ const {
     getLabourDetailsById,
     getAllLabours,
     getLoggedInUser,
-    updateUserProfile,
     deleteUser,
     updateLocation,
     searchUsers,
@@ -21,7 +20,6 @@ const { verifyUser, verifyAdmin, verifyAllToken } = require("../middleware/verif
 const router = express.Router();
 
 router.get('/me', verifyAllToken(['labour', 'contractor']), getLoggedInUser);
-router.patch('/update/:id', updateUserProfile);
 router.patch('/update-location', verifyAllToken(['labour']), updateLocation);
 router.post('/profile-image', verifyAllToken(['labour', 'contractor']), uploadToLocal, uploadProfileImage);
 
@@ -29,7 +27,6 @@ router.get('/labour-details', verifyAllToken(['labour']), getLabourDetailsById);
 
 // admin routes
 router.put('/role/update-user-details', verifyAllToken(['labour', 'contractor']), uploadToLocal, updateRoleBasisUser);
-router.patch('/admin/update/:id', updateUserProfile);
 router.get('/admin/get-all', verifyAllToken(['admin', 'labour']), getAllUsers);
 router.put("/admin/contractor/:id/toggle-agent", verifyAllToken(["admin"]), toggleContractorAgent);
 router.get('/contractor/all-labour', verifyAllToken(['contractor']), getAllLabours);
