@@ -1,5 +1,6 @@
 const admin = require('../utils/firebase');
 const User = require('../models/userModel');
+const { sendAndSaveNotification } = require('../controllers/notificationController');
 
 // Send notification to all labours
 const sendJobNotificationToAllLabours = async (jobData) => {
@@ -64,6 +65,29 @@ const sendJobNotificationToAllLabours = async (jobData) => {
           console.log(`Failed for token: ${fcmTokens[idx]}, error: ${resp.error}`);
         }
       });
+    }
+    
+    // Save notifications to database
+    try {
+      for (let i = 0; i < labours.length; i++) {
+        const labour = labours[i];
+        if (response.responses[i] && response.responses[i].success) {
+          await sendAndSaveNotification(labour._id, {
+            title: 'Nayi Job Available! 🛠️',
+            body: `${jobData.title} - ${jobData.location.address || jobData.jobTiming}`,
+            type: 'JOB_POST',
+            job: jobData._id,
+            data: {
+              jobId: jobData._id.toString(),
+              title: jobData.title,
+              description: jobData.description,
+              contractorId: jobData.contractor ? jobData.contractor.toString() : 'unknown'
+            }
+          }, labour.fcmToken);
+        }
+      }
+    } catch (dbError) {
+      console.error('Error saving notifications to database:', dbError);
     }
     
     return response;
@@ -139,6 +163,29 @@ const sendJobNotificationToNearbyLabours = async (jobData, maxDistance = 50000) 
 
     const response = await admin.messaging().sendEachForMulticast(message);
     console.log(`Notification sent successfully to ${response.successCount} nearby labours`);
+    
+    // Save notifications to database
+    try {
+      for (let i = 0; i < nearbyLabours.length; i++) {
+        const labour = nearbyLabours[i];
+        if (response.responses[i] && response.responses[i].success) {
+          await sendAndSaveNotification(labour._id, {
+            title: 'Paas Mein Nayi Job! 📍',
+            body: `${jobData.title} - ${jobData.location.address || 'Aapke area mein'}`,
+            type: 'NEARBY_JOB',
+            job: jobData._id,
+            data: {
+              jobId: jobData._id.toString(),
+              title: jobData.title,
+              location: jobData.location.address || '',
+              distance: 'Near you'
+            }
+          }, labour.fcmToken);
+        }
+      }
+    } catch (dbError) {
+      console.error('Error saving nearby notifications to database:', dbError);
+    }
     
     return response;
   } catch (error) {

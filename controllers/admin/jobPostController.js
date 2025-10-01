@@ -1,6 +1,8 @@
 const JobPost = require("../../models/jobPostModel");
 const Skill = require("../../models/skillModel");
+const User = require("../../models/userModel");
 const { sendJobNotificationToAllLabours, sendJobNotificationToNearbyLabours } = require("../../service/notificationService");
+const { sendAndSaveNotification } = require("../notificationController");
 
 // Create Job Post (Admin)
 const createJobPost = async (req, res) => {
