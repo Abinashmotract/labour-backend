@@ -11,14 +11,11 @@ const snsClient = new SNSClient({
   }
 });
 
-// Generate and send OTP
 const sendOTPMobile = async (phoneNumber) => {
   try {
-    // 1. Generate 6-digit OTP
     const otp = crypto.randomInt(100000, 999999).toString();
     const message = `Your OTP is ${otp}. Valid for 5 minutes.`;
 
-    // 2. Save OTP to DB with expiry (5 mins)
     await User.findOneAndUpdate(
       { phoneNumber },
       { 
@@ -57,7 +54,6 @@ const verifyOTPMobile = async (phoneNumber, code) => {
     const user = await User.findOne({ phoneNumber });
     if (!user) return { success: false, error: "User not found" };
 
-    // 2. Check expiry and attempts
     if (user.otpAttempts >= 3) {
       return { success: false, error: "Max attempts reached" };
     }

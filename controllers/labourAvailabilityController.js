@@ -257,15 +257,22 @@ const getMyAvailabilityRequests = async (req, res) => {
     }
 
     const requests = await LabourAvailability.find(query)
-      .populate('skills', 'name')
-      .populate('matchedJobs.job', 'title description location jobTiming')
-      .populate('matchedJobs.contractor', 'firstName lastName phoneNumber')
+      .select('_id availabilityDate isAvailable status createdAt')
       .sort({ createdAt: -1 });
+
+    // Format the response to match the submit format
+    const formattedRequests = requests.map(request => ({
+      requestId: request._id,
+      availabilityDate: request.availabilityDate,
+      isAvailable: request.isAvailable,
+      status: request.status,
+      createdAt: request.createdAt
+    }));
 
     return res.status(200).json({
       success: true,
       message: 'उपलब्धता अनुरोध सफलतापूर्वक प्राप्त किए गए',
-      data: requests
+      data: formattedRequests
     });
 
   } catch (error) {
