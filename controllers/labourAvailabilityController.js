@@ -549,21 +549,27 @@ const getAvailableLaboursByDate = async (req, res) => {
     }
 
     const availableLabours = await LabourAvailability.find(query)
-      .populate({
-        path: 'labour',
-        model: 'User',
-        select: 'firstName lastName phoneNumber profilePicture'
-      })
-      .populate('skills', 'name nameHindi')
       .sort({ createdAt: -1 });
+
+    // Manually populate labour data
+    const populatedLabours = await Promise.all(availableLabours.map(async (labour) => {
+      const labourData = await User.findById(labour.labour).select('firstName lastName phoneNumber profilePicture');
+      const skillsData = await Skill.find({ _id: { $in: labour.skills } }).select('name nameHindi');
+      
+      return {
+        ...labour.toObject(),
+        labour: labourData,
+        skills: skillsData
+      };
+    }));
 
     return res.status(200).json({
       success: true,
       message: `Available labourers for ${requestedDate.toDateString()} fetched successfully`,
       data: {
         date: requestedDate.toISOString().split('T')[0],
-        count: availableLabours.length,
-        labourers: availableLabours
+        count: populatedLabours.length,
+        labourers: populatedLabours
       }
     });
 
@@ -644,21 +650,27 @@ const getAvailableLabours = async (req, res) => {
     }
 
     const availableLabours = await LabourAvailability.find(query)
-      .populate({
-        path: 'labour',
-        model: 'User',
-        select: 'firstName lastName phoneNumber profilePicture'
-      })
-      .populate('skills', 'name nameHindi')
       .sort({ availabilityDate: 1, createdAt: -1 });
 
-    console.log('Populated results count:', availableLabours.length);
+    // Manually populate labour data
+    const populatedLabours = await Promise.all(availableLabours.map(async (labour) => {
+      const labourData = await User.findById(labour.labour).select('firstName lastName phoneNumber profilePicture');
+      const skillsData = await Skill.find({ _id: { $in: labour.skills } }).select('name nameHindi');
+      
+      return {
+        ...labour.toObject(),
+        labour: labourData,
+        skills: skillsData
+      };
+    }));
+
+    console.log('Populated results count:', populatedLabours.length);
     console.log('=== End Debug ===');
 
     return res.status(200).json({
       success: true,
       message: 'उपलब्ध मजदूर सफलतापूर्वक प्राप्त',
-      data: availableLabours
+      data: populatedLabours
     });
 
   } catch (error) {
