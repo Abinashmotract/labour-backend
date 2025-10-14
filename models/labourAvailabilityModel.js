@@ -40,6 +40,10 @@ const labourAvailabilitySchema = new mongoose.Schema({
     enum: ['active', 'expired', 'cancelled'],
     default: 'active'
   },
+  isAvailable: {
+    type: Boolean,
+    default: true
+  },
   matchedJobs: [{
     job: {
       type: mongoose.Schema.Types.ObjectId,
