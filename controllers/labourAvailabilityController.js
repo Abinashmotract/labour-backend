@@ -30,9 +30,25 @@ const submitAvailabilityRequest = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Validate all dates
+    // Validate all dates and extract availability status
     const validDates = [];
-    for (const dateStr of datesToProcess) {
+    for (const dateItem of datesToProcess) {
+      let dateStr, isAvailable = true;
+      
+      // Handle both string format and object format
+      if (typeof dateItem === 'string') {
+        dateStr = dateItem;
+        isAvailable = true; // Default to true for backward compatibility
+      } else if (typeof dateItem === 'object' && dateItem.date) {
+        dateStr = dateItem.date;
+        isAvailable = dateItem.isAvailable !== undefined ? dateItem.isAvailable : true;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: `अमान्य तिथि प्रारूप: ${JSON.stringify(dateItem)}`
+        });
+      }
+
       const requestedDate = new Date(dateStr);
       
       if (isNaN(requestedDate.getTime())) {
@@ -51,7 +67,7 @@ const submitAvailabilityRequest = async (req, res) => {
 
       // Normalize the date to start of day
       requestedDate.setHours(0, 0, 0, 0);
-      validDates.push(requestedDate);
+      validDates.push({ date: requestedDate, isAvailable });
     }
 
     // Get labour details
@@ -73,10 +89,11 @@ const submitAvailabilityRequest = async (req, res) => {
 
     // Check for existing requests and create new ones
     const createdRequests = [];
+    const updatedRequests = [];
     const skippedDates = [];
     const errors = [];
 
-    for (const requestedDate of validDates) {
+    for (const { date: requestedDate, isAvailable } of validDates) {
       // Check if already submitted for this date
       const existingRequest = await LabourAvailability.findOne({
         labour: labourId,
@@ -85,7 +102,14 @@ const submitAvailabilityRequest = async (req, res) => {
       });
 
       if (existingRequest) {
-        skippedDates.push(requestedDate.toDateString());
+        // Update existing request with new availability status
+        existingRequest.isAvailable = isAvailable;
+        await existingRequest.save();
+        updatedRequests.push({
+          requestId: existingRequest._id,
+          availabilityDate: existingRequest.availabilityDate,
+          isAvailable: existingRequest.isAvailable
+        });
         continue;
       }
 
@@ -100,14 +124,21 @@ const submitAvailabilityRequest = async (req, res) => {
             type: 'Point',
             coordinates: labour.location.coordinates,
             address: labour.addressLine1 || labour.location.address || ''
-          }
+          },
+          isAvailable: isAvailable
         });
 
         await availabilityRequest.save();
-        createdRequests.push(availabilityRequest);
+        createdRequests.push({
+          requestId: availabilityRequest._id,
+          availabilityDate: availabilityRequest.availabilityDate,
+          isAvailable: availabilityRequest.isAvailable
+        });
 
-        // Find matching jobs and notify contractors
-        await findAndNotifyMatchingJobs(availabilityRequest);
+        // Find matching jobs and notify contractors only if available
+        if (isAvailable) {
+          await findAndNotifyMatchingJobs(availabilityRequest);
+        }
       } catch (error) {
         errors.push(`${requestedDate.toDateString()}: ${error.message}`);
       }
@@ -118,20 +149,22 @@ const submitAvailabilityRequest = async (req, res) => {
       success: true,
       message: `उपलब्धता अनुरोध सफलतापूर्वक जमा किया गया`,
       data: {
-        createdRequests: createdRequests.map(req => ({
-          requestId: req._id,
-          availabilityDate: req.availabilityDate,
-        })),
+        createdRequests: createdRequests,
+        updatedRequests: updatedRequests,
         skippedDates: skippedDates,
         errors: errors,
         totalCreated: createdRequests.length,
+        totalUpdated: updatedRequests.length,
         totalSkipped: skippedDates.length,
         totalErrors: errors.length,
         skills: labour.skills && labour.skills.length > 0 ? labour.skills.map(skill => skill.name) : []
       }
     };
 
-    // Add warnings if some dates were skipped or had errors
+    // Add warnings if some dates were updated, skipped or had errors
+    if (updatedRequests.length > 0) {
+      response.message += ` (${updatedRequests.length} तिथियां अपडेट की गईं)`;
+    }
     if (skippedDates.length > 0) {
       response.message += ` (${skippedDates.length} तिथियां पहले से जमा हैं)`;
     }
@@ -463,13 +496,6 @@ const getAvailableLaboursByDate = async (req, res) => {
       });
     }
 
-    if (!skills) {
-      return res.status(400).json({
-        success: false,
-        message: 'कौशल पैरामीटर आवश्यक है'
-      });
-    }
-
     const requestedDate = new Date(date);
     if (isNaN(requestedDate.getTime())) {
       return res.status(400).json({
@@ -480,28 +506,27 @@ const getAvailableLaboursByDate = async (req, res) => {
 
     requestedDate.setHours(0, 0, 0, 0);
 
-    const skillNames = Array.isArray(skills) ? skills : skills.split(',');
-    
-    // Find skill ObjectIds by names
-    const skillObjects = await Skill.find({ 
-      name: { $in: skillNames }, 
-      isActive: true 
-    });
-    
-    if (skillObjects.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'कोई वैध कौशल नहीं मिला'
-      });
-    }
-    
-    const skillIds = skillObjects.map(skill => skill._id);
-
     let query = {
       status: 'active',
       availabilityDate: requestedDate,
-      skills: { $in: skillIds }
+      isAvailable: true
     };
+
+    // Only filter by skills if skills parameter is provided
+    if (skills) {
+      const skillNames = Array.isArray(skills) ? skills : skills.split(',');
+      
+      // Find skill ObjectIds by names
+      const skillObjects = await Skill.find({ 
+        name: { $in: skillNames }, 
+        isActive: true 
+      });
+      
+      if (skillObjects.length > 0) {
+        const skillIds = skillObjects.map(skill => skill._id);
+        query.skills = { $in: skillIds };
+      }
+    }
 
     // Add location filter if coordinates provided
     if (longitude && latitude) {
@@ -553,31 +578,6 @@ const getAvailableLabours = async (req, res) => {
     console.log('Skills query:', skills);
     console.log('Contractor ID:', contractorId);
 
-    if (!skills) {
-      return res.status(400).json({
-        success: false,
-        message: 'कौशल पैरामीटर आवश्यक है'
-      });
-    }
-
-    const skillNames = Array.isArray(skills) ? skills : skills.split(',');
-    console.log('Skill names:', skillNames);
-    
-    // Find skill ObjectIds by names
-    const skillObjects = await Skill.find({ 
-      name: { $in: skillNames }, 
-      isActive: true 
-    });
-    console.log('Found skills:', skillObjects.map(s => ({ name: s.name, id: s._id })));
-    
-    if (skillObjects.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'कोई वैध कौशल नहीं मिला'
-      });
-    }
-    
-    const skillIds = skillObjects.map(skill => skill._id);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     console.log('Today:', today.toISOString());
@@ -585,8 +585,27 @@ const getAvailableLabours = async (req, res) => {
     let query = {
       status: 'active',
       availabilityDate: { $gte: today },
-      skills: { $in: skillIds }
+      isAvailable: true
     };
+
+    // Only filter by skills if skills parameter is provided
+    if (skills) {
+      const skillNames = Array.isArray(skills) ? skills : skills.split(',');
+      console.log('Skill names:', skillNames);
+      
+      // Find skill ObjectIds by names
+      const skillObjects = await Skill.find({ 
+        name: { $in: skillNames }, 
+        isActive: true 
+      });
+      console.log('Found skills:', skillObjects.map(s => ({ name: s.name, id: s._id })));
+      
+      if (skillObjects.length > 0) {
+        const skillIds = skillObjects.map(skill => skill._id);
+        query.skills = { $in: skillIds };
+      }
+    }
+    
     console.log('Query:', JSON.stringify(query, null, 2));
 
     // Add location filter if coordinates provided
