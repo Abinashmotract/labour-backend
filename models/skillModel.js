@@ -8,6 +8,16 @@ const skillSchema = new mongoose.Schema({
     unique: true,
     lowercase: true
   },
+  nameHindi: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  category: {
+    type: String,
+    required: true,
+    trim: true
+  },
   isActive: {
     type: Boolean,
     default: true

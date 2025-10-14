@@ -63,7 +63,7 @@ const getAllNotifications = async (req, res) => {
     console.error('Error getting notifications:', error);
     return res.status(500).json({
       success: false,
-      message: 'Internal Server Error'
+      message: 'आंतरिक सर्वर त्रुटि'
     });
   }
 };
@@ -86,7 +86,7 @@ const getNotificationById = async (req, res) => {
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: 'Notification not found'
+        message: 'सूचना नहीं मिली'
       });
     }
     
@@ -105,7 +105,7 @@ const getNotificationById = async (req, res) => {
     console.error('Error getting notification by ID:', error);
     return res.status(500).json({
       success: false,
-      message: 'Internal Server Error'
+      message: 'आंतरिक सर्वर त्रुटि'
     });
   }
 };
@@ -125,7 +125,7 @@ const deleteNotification = async (req, res) => {
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: 'Notification not found'
+        message: 'सूचना नहीं मिली'
       });
     }
     
@@ -135,13 +135,13 @@ const deleteNotification = async (req, res) => {
     
     return res.status(200).json({
       success: true,
-      message: 'Notification deleted successfully'
+      message: 'सूचना सफलतापूर्वक हटाई गई'
     });
   } catch (error) {
     console.error('Error deleting notification:', error);
     return res.status(500).json({
       success: false,
-      message: 'Internal Server Error'
+      message: 'आंतरिक सर्वर त्रुटि'
     });
   }
 };
@@ -161,7 +161,7 @@ const markAsRead = async (req, res) => {
     if (!notification) {
       return res.status(404).json({
         success: false,
-        message: 'Notification not found'
+        message: 'सूचना नहीं मिली'
       });
     }
     
@@ -173,13 +173,13 @@ const markAsRead = async (req, res) => {
     
     return res.status(200).json({
       success: true,
-      message: 'Notification marked as read'
+      message: 'सूचना पढ़ा गया के रूप में चिह्नित'
     });
   } catch (error) {
     console.error('Error marking notification as read:', error);
     return res.status(500).json({
       success: false,
-      message: 'Internal Server Error'
+      message: 'आंतरिक सर्वर त्रुटि'
     });
   }
 };
@@ -203,13 +203,13 @@ const markAllAsRead = async (req, res) => {
     
     return res.status(200).json({
       success: true,
-      message: 'All notifications marked as read'
+      message: 'सभी सूचनाएं पढ़ा गया के रूप में चिह्नित'
     });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);
     return res.status(500).json({
       success: false,
-      message: 'Internal Server Error'
+      message: 'आंतरिक सर्वर त्रुटि'
     });
   }
 };
@@ -278,7 +278,7 @@ const getNotificationStats = async (req, res) => {
     console.error('Error getting notification stats:', error);
     return res.status(500).json({
       success: false,
-      message: 'Internal Server Error'
+      message: 'आंतरिक सर्वर त्रुटि'
     });
   }
 };

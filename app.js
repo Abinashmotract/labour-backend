@@ -6,7 +6,13 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
 const { Server } = require("socket.io");
-const http = require("http"); 
+const http = require("http");
+
+// Import models to ensure they are registered
+require("./models/userModel");
+require("./models/Contracter");
+require("./models/skillModel");
+require("./models/labourAvailabilityModel"); 
 
 const app = express();
 
@@ -55,6 +61,7 @@ const skillRoute = require("./routes/admin/skillRoute");
 const jobPostRoute = require("./routes/admin/jobPostRoute");
 const jobApplicationRoute = require("./routes/jobApplicationRoute");
 const notificationRoute = require("./routes/notificationRoute");
+const labourAvailabilityRoute = require("./routes/labourAvailabilityRoute");
 
 const bodyParser = require("body-parser");
 const PORT = process.env.PORT || 3512;
@@ -76,6 +83,7 @@ app.use("/api/skill/admin", skillRoute);
 app.use("/api/contractor", jobPostRoute);
 app.use("/api/job", jobApplicationRoute);
 app.use("/api/notifications", notificationRoute);
+app.use("/api/labour-availability", labourAvailabilityRoute);
 
 // Response handler Middleware
 app.use((obj, req, res, next) => {

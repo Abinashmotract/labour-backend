@@ -29,7 +29,7 @@ const getAllUsers = async (req, res) => {
       return res.status(200).json({
         success: true,
         status: 200,
-        message: "No signup users found!",
+        message: "कोई साइनअप उपयोगकर्ता नहीं मिला!",
         data: [],
       });
     }
@@ -37,7 +37,7 @@ const getAllUsers = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Signup users fetched successfully!",
+      message: "साइनअप उपयोगकर्ता सफलतापूर्वक प्राप्त!",
       data: users,
     });
   } catch (error) {
@@ -57,7 +57,7 @@ const toggleContractorAgent = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "Contractor not found!",
+        message: "ठेकेदार नहीं मिला!",
       });
     }
 
@@ -101,7 +101,7 @@ const getLaboursByAgent = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "Agent not found",
+        message: "एजेंट नहीं मिला",
       });
     }
     const labours = await User.find({ referredBy: agentId, role: "labour" })
@@ -139,14 +139,14 @@ const getLabourDetailsById = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "Labour not found!",
+        message: "मजदूर नहीं मिला!",
       });
     }
 
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Labour details fetched successfully!",
+      message: "मजदूर विवरण सफलतापूर्वक प्राप्त!",
       data: labour,
     });
   } catch (error) {
@@ -170,14 +170,14 @@ const getLoggedInUser = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "User not found!",
+        message: "उपयोगकर्ता नहीं मिला!",
       });
     }
 
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "User fetched successfully!",
+      message: "उपयोगकर्ता सफलतापूर्वक प्राप्त!",
       data: user,
     });
   } catch (error) {
@@ -207,14 +207,14 @@ const updateRoleBasisUser = async (req, res) => {
     } = req.body;
 
     if (!userId) {
-      return res.status(400).json({ success: false, status: 400, message: "User ID is required" });
+      return res.status(400).json({ success: false, status: 400, message: "यूजर आईडी आवश्यक है" });
     }
 
     let user = await User.findById(userId);
-    if (!user) return res.status(404).json({ success: false, status: 404, message: "User not found" });
+    if (!user) return res.status(404).json({ success: false, status: 404, message: "उपयोगकर्ता नहीं मिला" });
 
     if (!["labour", "contractor"].includes(user.role)) {
-      return res.status(403).json({ success: false, status: 403, message: "Only labour/contractor users can be updated here" });
+      return res.status(403).json({ success: false, status: 403, message: "यहां केवल मजदूर/ठेकेदार उपयोगकर्ता अपडेट किए जा सकते हैं" });
     }
 
     if (firstName) user.firstName = firstName;
@@ -264,7 +264,7 @@ const updateRoleBasisUser = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "User updated successfully",
+      message: "उपयोगकर्ता सफलतापूर्वक अपडेट",
       data: user,
     });
   } catch (error) {
@@ -283,14 +283,14 @@ const deleteUser = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "User not found!",
+        message: "उपयोगकर्ता नहीं मिला!",
       });
     }
 
     res.status(200).json({
       success: true,
       status: 200,
-      message: "User deleted successfully!",
+      message: "उपयोगकर्ता सफलतापूर्वक हटाया गया!",
     });
   } catch (error) {
     return res.status(500).json({
@@ -315,7 +315,7 @@ const updateLocation = async (req, res) => {
 
     res
       .status(200)
-      .json({ success: true, status: 200, message: "Location Updated!" });
+      .json({ success: true, status: 200, message: "स्थान अपडेट!" });
   } catch (err) {
     res.status(500).json({ success: false, status: 500, message: err.message });
   }
@@ -400,7 +400,7 @@ const searchUsers = async (req, res) => {
     res.json({
       success: true,
       status: 200,
-      message: "Search results successful!",
+      message: "खोज परिणाम सफल!",
       count: users.length,
       total,
       page: Number(page),
@@ -412,7 +412,7 @@ const searchUsers = async (req, res) => {
     res.status(500).json({
       success: false,
       status: 500,
-      message: "Search failed",
+      message: "खोज असफल",
       error: error.message,
     });
   }
@@ -428,7 +428,7 @@ const deleteMultipleUsers = async (req, res) => {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "User IDs array is required",
+        message: "यूजर आईडी सरणी आवश्यक है",
       });
     }
 
@@ -440,7 +440,7 @@ const deleteMultipleUsers = async (req, res) => {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Invalid user IDs",
+        message: "अमान्य यूजर आईडी",
         invalidIds,
       });
     }
@@ -455,7 +455,7 @@ const deleteMultipleUsers = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "No users found to delete",
+        message: "हटाने के लिए कोई उपयोगकर्ता नहीं मिला",
       });
     }
 
@@ -486,7 +486,7 @@ const uploadProfileImage = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "User not found!",
+        message: "उपयोगकर्ता नहीं मिला!",
       });
     }
 
@@ -511,12 +511,14 @@ const uploadProfileImage = async (req, res) => {
 const getAllLabours = async (req, res) => {
   try {
     const contractorId = req.user.id;
+    const { availabilityDate } = req.query; // Get availability date from query params
+    
     const contractor = await User.findById(contractorId);
     if (!contractor || contractor.role !== "contractor") {
       return res.status(403).json({
         success: false,
         status: 403,
-        message: "Only contractors can access this data",
+        message: "केवल ठेकेदार ही इस डेटा तक पहुंच सकते हैं",
       });
     }
     const contractorCategory = contractor.work_category;
@@ -525,37 +527,111 @@ const getAllLabours = async (req, res) => {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Contractor has no work category defined",
+        message: "ठेकेदार का कोई कार्य श्रेणी परिभाषित नहीं है",
       });
     }
-    const labours = await User.find({
+
+    // Base query for labours
+    let labourQuery = {
       role: "labour",
       work_category: contractorCategory,
-    }).select(
+    };
+
+    let labours = await User.find(labourQuery).select(
       "-password -refreshToken -otp -otpAttempts -otpFailedAttempts -lastOtpRequest"
     );
+
+    // If availability date is provided, filter labours who are available on that date
+    if (availabilityDate) {
+      try {
+        const requestedDate = new Date(availabilityDate);
+        if (isNaN(requestedDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            status: 400,
+            message: "अमान्य तिथि प्रारूप",
+          });
+        }
+
+        // Normalize the date to start of day
+        requestedDate.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(requestedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        // Find labour IDs who are available on the requested date
+        const LabourAvailability = require('../models/labourAvailabilityModel');
+        const availableLabours = await LabourAvailability.find({
+          availabilityDate: {
+            $gte: requestedDate,
+            $lte: endOfDay
+          },
+          status: 'active'
+        }).select('labour');
+
+        const availableLabourIds = availableLabours.map(avail => avail.labour);
+
+        // Filter labours to only include those who are available
+        labours = labours.filter(labour => availableLabourIds.includes(labour._id.toString()));
+
+        // Add availability information to each labour
+        labours = await Promise.all(labours.map(async (labour) => {
+          const availability = await LabourAvailability.findOne({
+            labour: labour._id,
+            availabilityDate: {
+              $gte: requestedDate,
+              $lte: endOfDay
+            },
+            status: 'active'
+          }).populate('skills', 'name nameHindi category');
+
+          return {
+            ...labour.toObject(),
+            availability: availability ? {
+              availabilityDate: availability.availabilityDate,
+              skills: availability.skills,
+              location: availability.location,
+              status: availability.status
+            } : null
+          };
+        }));
+
+      } catch (dateError) {
+        console.error("Date filtering error:", dateError);
+        return res.status(400).json({
+          success: false,
+          status: 400,
+          message: "तिथि फ़िल्टरिंग में त्रुटि",
+        });
+      }
+    }
+
     if (!labours || labours.length === 0) {
       return res.status(200).json({
         success: true,
         status: 200,
-        message: "No matching labours found!",
+        message: availabilityDate ? "इस तिथि पर कोई उपलब्ध मजदूर नहीं मिला!" : "कोई मिलान करने वाला मजदूर नहीं मिला!",
         total: 0,
         data: [],
       });
     }
+
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Matching labours fetched successfully!",
+      message: availabilityDate ? "उपलब्ध मजदूर सफलतापूर्वक प्राप्त किए गए!" : "मिलान करने वाले मजदूर सफलतापूर्वक प्राप्त किए गए!",
       total: labours.length,
       data: labours,
+      filterApplied: availabilityDate ? {
+        availabilityDate: availabilityDate,
+        description: `मजदूर जो ${new Date(availabilityDate).toLocaleDateString('hi-IN')} को उपलब्ध हैं`
+      } : null
     });
   } catch (error) {
     console.error("Get labours error:", error);
     return res.status(500).json({
       success: false,
       status: 500,
-      message: error.message,
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
