@@ -7,7 +7,8 @@ const {
     login,
     sendOTP,
     verifyOtp,
-    updateFcmToken
+    updateFcmToken,
+    forgotPassword
 } = require('../controllers/authController');
 // const { verifyUser, verifyAdmin } = require("../middleware/verifyToken");
 const { uploadToS3 } = require("../config/AWSConfig");
@@ -40,6 +41,7 @@ router.post("/update-fcmtoken", verifyAllToken(["labour", "contractor"]), update
 router.post('/send-email', otpRateLimiter, sendEmail);
 router.post('/verify-otp', verifyOTP);
 router.post('/reset-password', resetPassword);
+router.post('/forgot-password', otpRateLimiter, forgotPassword);
 router.post('/login', login);
 router.post('/user/login', login);
 

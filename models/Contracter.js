@@ -14,6 +14,8 @@ const contracterSchema = new mongoose.Schema(
         isAgent: { type: Boolean, default: false },
         profileCompletionStep: { type: String, default: "personalInfo", },
         fcmToken: { type: String, default: "" },
+        otp: { type: String }, // 6 digit OTP
+        otpExpiration: { type: Number }, // OTP expiry timestamp
     },
     {
         timestamps: true, // adds createdAt and updatedAt
