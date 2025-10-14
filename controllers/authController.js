@@ -484,6 +484,69 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+// Forgot password for contractors using phone number
+const forgotPassword = async (req, res, next) => {
+  const { phoneNumber, role } = req.body;
+
+  try {
+    // Validate inputs
+    if (!phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number is required"
+      });
+    }
+
+    if (!role || !['labour', 'contractor'].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role specified. Must be 'labour' or 'contractor'"
+      });
+    }
+
+    // Find account by phone number and role
+    const Model = role === 'labour' ? User : Contracter;
+    const account = await Model.findOne({ phoneNumber, role });
+
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: `${role} not found with this phone number`
+      });
+    }
+
+    // Check OTP cooldown
+    const now = Date.now();
+    if (account.otpExpiration && account.otpExpiration > now) {
+      const remainingTime = Math.ceil((account.otpExpiration - now) / (60 * 1000));
+      return res.status(429).json({
+        success: false,
+        message: `Please wait ${remainingTime} minutes before requesting a new OTP`
+      });
+    }
+
+    // Generate static OTP based on role
+    const otp = role === 'contractor' ? '333333' : '888888';
+    account.otp = otp;
+    account.otpExpiration = now + 15 * 60 * 1000; // 15 minutes expiry
+    await account.save();
+
+    // For now, return OTP in response (in production, send via SMS)
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent successfully to your phone number",
+      otp // ⚠️ Remove this in production - send via SMS instead
+    });
+
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+};
+
 // Save/Update FCM Token for logged-in user
 const updateFcmToken = async (req, res) => {
   try {
@@ -520,5 +583,6 @@ module.exports = {
   login,
   sendOTP,
   verifyOtp,
-  updateFcmToken
+  updateFcmToken,
+  forgotPassword
 }
