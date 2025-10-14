@@ -15,7 +15,7 @@ const sendOTP = async (req, res) => {
     if (!phoneNumber && !userId) {
       return res.status(400).json({
         success: false,
-        message: "Phone number or UserId is required",
+        message: "फोन नंबर या यूजर आईडी आवश्यक है",
       });
     }
 
@@ -34,7 +34,7 @@ const sendOTP = async (req, res) => {
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "उपयोगकर्ता नहीं मिला" });
     }
 
     // Save OTP in DB
@@ -44,14 +44,14 @@ const sendOTP = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully",
+      message: "OTP सफलतापूर्वक भेजा गया",
       otp // ⚠️ testing only, remove later
     });
   } catch (err) {
     console.error("Send OTP Error:", err);
     return res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -67,13 +67,13 @@ const verifyOtp = async (req, res) => {
       user = await User.findOne({ phoneNumber });
     }
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "उपयोगकर्ता नहीं मिला" });
     }
     if (!user.otp || user.otp !== otp) {
-      return res.status(400).json({ success: false, message: "Invalid OTP" });
+      return res.status(400).json({ success: false, message: "अमान्य OTP" });
     }
     if (!user.otpExpiry || user.otpExpiry < new Date()) {
-      return res.status(400).json({ success: false, message: "OTP expired" });
+      return res.status(400).json({ success: false, message: "OTP समाप्त हो गया" });
     }
     user.isPhoneVerified = true;
     user.otp = undefined;
@@ -84,7 +84,7 @@ const verifyOtp = async (req, res) => {
     await user.save();
     return res.json({
       success: true,
-      message: "Phone verified successfully",
+      message: "फोन सफलतापूर्वक सत्यापित हो गया",
       data: {
         userId: user._id,
         phoneNumber: user.phoneNumber,
@@ -118,10 +118,10 @@ const roleBasisSignUp = async (req, res) => {
     } = req.body;
     const user = await User.findOne({ phoneNumber });
     if (!user || !user.isPhoneVerified) {
-      return res.status(400).json({ success: false, message: "Phone not verified" });
+      return res.status(400).json({ success: false, message: "फोन सत्यापित नहीं है" });
     }
     if (user.email) {
-      return res.status(400).json({ success: false, message: "User already registered" });
+      return res.status(400).json({ success: false, message: "उपयोगकर्ता पहले से पंजीकृत है" });
     }
     const hashedPassword = await argon2.hash(password);
     user.firstName = firstName;
@@ -172,7 +172,7 @@ const roleBasisSignUp = async (req, res) => {
     await user.save();
     return res.status(201).json({
       success: true,
-      message: "User registered successfully",
+      message: "उपयोगकर्ता सफलतापूर्वक पंजीकृत",
     });
   } catch (error) {
     console.error("Signup error:", error);
@@ -188,21 +188,21 @@ const login = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Phone number is required!"
+        message: "फोन नंबर आवश्यक है!"
       });
     }
     if (!password) {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Password is required!"
+        message: "पासवर्ड आवश्यक है!"
       });
     }
     if (!role || !["labour", "contractor"].includes(role)) {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Invalid role specified! Must be labour or contractor"
+        message: "अमान्य भूमिका निर्दिष्ट! मजदूर या ठेकेदार होना चाहिए"
       });
     }
     const account = await User.findOne({ phoneNumber, role });
@@ -210,14 +210,14 @@ const login = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: `${role} with this phone number not found!`,
+        message: `${role} इस फोन नंबर के साथ नहीं मिला!`,
       });
     }
     if (role === "contractor" && account.isApproved === false) {
       return res.status(401).json({
         success: false,
         status: 401,
-        message: "Contractor not approved!"
+        message: "ठेकेदार अनुमोदित नहीं!"
       });
     }
     const isPasswordValid = await argon2.verify(account.password, password);
@@ -225,7 +225,7 @@ const login = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Incorrect password!",
+        message: "गलत पासवर्ड!",
       });
     }
     if (longitude && latitude) {
@@ -257,7 +257,7 @@ const login = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Login successful!",
+      message: "लॉगिन सफल!",
       id: accountData._id,
       token,
       refreshToken: accountData.refreshToken,
@@ -281,11 +281,11 @@ const sendEmail = async (req, res, next) => {
 
   try {
     if (!validator.isEmail(email)) {
-      return res.status(400).json({ message: "Invalid email format" });
+      return res.status(400).json({ message: "अमान्य ईमेल प्रारूप" });
     }
 
     if (!role || !['labour', 'contractor'].includes(role)) {
-      return res.status(400).json({ message: "Invalid role specified" });
+      return res.status(400).json({ message: "अमान्य भूमिका निर्दिष्ट" });
     }
 
     // 2. Find Account by Role
@@ -295,7 +295,7 @@ const sendEmail = async (req, res, next) => {
     if (!account) {
       return res.status(404).json({
         success: false,
-        message: `${role} not found with this email`
+        message: `${role} इस ईमेल के साथ नहीं मिला`
       });
     }
 
@@ -305,7 +305,7 @@ const sendEmail = async (req, res, next) => {
       const remainingTime = Math.ceil((account.otpExpiration - now) / (60 * 1000));
       return res.status(429).json({
         success: false,
-        message: `Please wait ${remainingTime} minutes before requesting a new OTP`
+        message: `कृपया नया OTP अनुरोध करने से पहले ${remainingTime} मिनट प्रतीक्षा करें`
       });
     }
 
@@ -333,7 +333,7 @@ const sendEmail = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully!"
+      message: "OTP सफलतापूर्वक भेजा गया!"
     });
 
   } catch (error) {
@@ -354,7 +354,7 @@ const verifyOTP = async (req, res, next) => {
     if (!otp || !role || !['labour', 'contractor'].includes(role)) {
       return res.status(400).json({
         success: false,
-        message: "Missing OTP or invalid role specified"
+        message: "OTP गुम है या अमान्य भूमिका निर्दिष्ट"
       });
     }
 
@@ -362,7 +362,7 @@ const verifyOTP = async (req, res, next) => {
     if (activeLocks.has(otp)) {
       return res.status(429).json({
         success: false,
-        message: "OTP verification already in progress. Please wait."
+        message: "OTP सत्यापन पहले से चल रहा है। कृपया प्रतीक्षा करें।"
       });
     }
 
@@ -383,7 +383,7 @@ const verifyOTP = async (req, res, next) => {
       activeLocks.delete(otp); // Release lock before returning
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired OTP"
+        message: "अमान्य या समाप्त OTP"
       });
     }
 
@@ -408,7 +408,7 @@ const verifyOTP = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: "OTP verified successfully!",
+      message: "OTP सफलतापूर्वक सत्यापित!",
       token,
       role: account.role // Return role for client-side handling
     });
@@ -436,7 +436,7 @@ const resetPassword = async (req, res, next) => {
     if (!email || !role || !['labour', 'contractor'].includes(role)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or expired token"
+        message: "अमान्य या समाप्त टोकन"
       });
     }
 
@@ -447,7 +447,7 @@ const resetPassword = async (req, res, next) => {
     if (!account) {
       return res.status(404).json({
         success: false,
-        message: "Account not found"
+        message: "खाता नहीं मिला"
       });
     }
 
@@ -463,7 +463,7 @@ const resetPassword = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      message: "Password reset successfully!"
+      message: "पासवर्ड सफलतापूर्वक रीसेट!"
     });
 
   } catch (error) {
@@ -473,13 +473,13 @@ const resetPassword = async (req, res, next) => {
     if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
-        message: "Invalid or expired token"
+        message: "अमान्य या समाप्त टोकन"
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "आंतरिक सर्वर त्रुटि"
     });
   }
 };
@@ -493,14 +493,14 @@ const forgotPassword = async (req, res, next) => {
     if (!phoneNumber) {
       return res.status(400).json({
         success: false,
-        message: "Phone number is required"
+        message: "फोन नंबर आवश्यक है"
       });
     }
 
     if (!role || !['labour', 'contractor'].includes(role)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid role specified. Must be 'labour' or 'contractor'"
+        message: "अमान्य भूमिका निर्दिष्ट। 'मजदूर' या 'ठेकेदार' होना चाहिए"
       });
     }
 
@@ -511,7 +511,7 @@ const forgotPassword = async (req, res, next) => {
     if (!account) {
       return res.status(404).json({
         success: false,
-        message: `${role} not found with this phone number`
+        message: `${role} इस फोन नंबर के साथ नहीं मिला`
       });
     }
 
@@ -521,7 +521,7 @@ const forgotPassword = async (req, res, next) => {
       const remainingTime = Math.ceil((account.otpExpiration - now) / (60 * 1000));
       return res.status(429).json({
         success: false,
-        message: `Please wait ${remainingTime} minutes before requesting a new OTP`
+        message: `कृपया नया OTP अनुरोध करने से पहले ${remainingTime} मिनट प्रतीक्षा करें`
       });
     }
 
@@ -534,7 +534,7 @@ const forgotPassword = async (req, res, next) => {
     // For now, return OTP in response (in production, send via SMS)
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully to your phone number",
+      message: "आपके फोन नंबर पर OTP सफलतापूर्वक भेजा गया",
       otp // ⚠️ Remove this in production - send via SMS instead
     });
 
@@ -542,7 +542,7 @@ const forgotPassword = async (req, res, next) => {
     console.error("Forgot password error:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error"
+      message: "आंतरिक सर्वर त्रुटि"
     });
   }
 };
@@ -555,7 +555,7 @@ const updateFcmToken = async (req, res) => {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "FCM token is required",
+        message: "FCM टोकन आवश्यक है",
       });
     }
     const userId = req.user.id;
@@ -563,14 +563,14 @@ const updateFcmToken = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "FCM token updated successfully",
+      message: "FCM टोकन सफलतापूर्वक अपडेट",
     });
   } catch (err) {
     console.error("Error updating FCM token:", err);
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };

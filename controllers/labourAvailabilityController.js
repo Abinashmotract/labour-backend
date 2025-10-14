@@ -1,0 +1,700 @@
+const LabourAvailability = require('../models/labourAvailabilityModel');
+const User = require('../models/userModel');
+const JobPost = require('../models/jobPostModel');
+const Skill = require('../models/skillModel');
+const { sendNotification } = require('../utils/notifications');
+
+// Submit availability request for specific date(s)
+const submitAvailabilityRequest = async (req, res) => {
+  try {
+    const { availabilityDate } = req.body;
+    const labourId = req.user.id;
+
+    // Validate input
+    if (!availabilityDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'उपलब्धता तिथि आवश्यक है'
+      });
+    }
+
+    // Ensure availabilityDate is always an array
+    if (!Array.isArray(availabilityDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'उपलब्धता तिथि हमेशा एक सरणी (array) के रूप में भेजी जानी चाहिए'
+      });
+    }
+    
+    const datesToProcess = availabilityDate;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Validate all dates
+    const validDates = [];
+    for (const dateStr of datesToProcess) {
+      const requestedDate = new Date(dateStr);
+      
+      if (isNaN(requestedDate.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: `अमान्य तिथि प्रारूप: ${dateStr}`
+        });
+      }
+
+      if (requestedDate < today) {
+        return res.status(400).json({
+          success: false,
+          message: `पिछली तिथि के लिए उपलब्धता जमा नहीं कर सकते: ${dateStr}`
+        });
+      }
+
+      // Normalize the date to start of day
+      requestedDate.setHours(0, 0, 0, 0);
+      validDates.push(requestedDate);
+    }
+
+    // Get labour details with skills
+    const labour = await User.findById(labourId).populate('skills', 'name');
+    if (!labour) {
+      return res.status(404).json({
+        success: false,
+        message: 'मजदूर नहीं मिला'
+      });
+    }
+
+    if (!labour.skills || labour.skills.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'कोई कौशल नहीं मिला। कृपया पहले अपनी प्रोफ़ाइल में कौशल जोड़ें'
+      });
+    }
+
+    // Check if labour has location data
+    if (!labour.location || !labour.location.coordinates) {
+      return res.status(400).json({
+        success: false,
+        message: 'प्रोफ़ाइल में स्थान नहीं मिला। कृपया पहले अपना स्थान अपडेट करें'
+      });
+    }
+
+    // Check for existing requests and create new ones
+    const createdRequests = [];
+    const skippedDates = [];
+    const errors = [];
+
+    for (const requestedDate of validDates) {
+      // Check if already submitted for this date
+      const existingRequest = await LabourAvailability.findOne({
+        labour: labourId,
+        availabilityDate: requestedDate,
+        status: 'active'
+      });
+
+      if (existingRequest) {
+        skippedDates.push(requestedDate.toDateString());
+        continue;
+      }
+
+      try {
+        // Create availability request using labour's stored location
+        const availabilityRequest = new LabourAvailability({
+          labour: labourId,
+          availabilityDate: requestedDate,
+          availabilityType: 'specific_date',
+          skills: labour.skills.map(skill => skill._id),
+          location: {
+            type: 'Point',
+            coordinates: labour.location.coordinates,
+            address: labour.addressLine1 || labour.location.address || ''
+          }
+        });
+
+        await availabilityRequest.save();
+        createdRequests.push(availabilityRequest);
+
+        // Find matching jobs and notify contractors
+        await findAndNotifyMatchingJobs(availabilityRequest);
+      } catch (error) {
+        errors.push(`${requestedDate.toDateString()}: ${error.message}`);
+      }
+    }
+
+    // Prepare response
+    const response = {
+      success: true,
+      message: `उपलब्धता अनुरोध सफलतापूर्वक जमा किया गया`,
+      data: {
+        createdRequests: createdRequests.map(req => ({
+          requestId: req._id,
+          availabilityDate: req.availabilityDate,
+        })),
+        skippedDates: skippedDates,
+        errors: errors,
+        totalCreated: createdRequests.length,
+        totalSkipped: skippedDates.length,
+        totalErrors: errors.length,
+        skills: labour.skills.map(skill => skill.name)
+      }
+    };
+
+    // Add warnings if some dates were skipped or had errors
+    if (skippedDates.length > 0) {
+      response.message += ` (${skippedDates.length} तिथियां पहले से जमा हैं)`;
+    }
+    if (errors.length > 0) {
+      response.message += ` (${errors.length} तिथियों में त्रुटि)`;
+    }
+
+    return res.status(201).json(response);
+
+  } catch (error) {
+    console.error('Error in submitAvailabilityRequest:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'आंतरिक सर्वर त्रुटि'
+    });
+  }
+};
+
+// Find matching jobs and notify contractors
+const findAndNotifyMatchingJobs = async (availabilityRequest) => {
+  try {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Find jobs that match the availability date and skills
+    const matchingJobs = await JobPost.find({
+      isActive: true,
+      isFilled: false,
+      validUntil: { $gte: today },
+      skills: { $in: availabilityRequest.skills },
+      location: {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: availabilityRequest.location.coordinates
+          },
+          $maxDistance: 50000 // 50km radius
+        }
+      }
+    }).populate('contractor', 'firstName lastName fcmToken')
+      .populate('skills', 'name');
+
+    console.log(`Found ${matchingJobs.length} matching jobs for labour availability`);
+
+    // Store matched jobs
+    availabilityRequest.matchedJobs = matchingJobs.map(job => ({
+      job: job._id,
+      contractor: job.contractor._id
+    }));
+    await availabilityRequest.save();
+
+    // Send notifications to contractors
+    for (const job of matchingJobs) {
+      if (job.contractor.fcmToken) {
+        const labour = await User.findById(availabilityRequest.labour);
+        const skillNames = job.skills.map(skill => skill.name).join(', ');
+        
+        await sendNotification(
+          job.contractor.fcmToken,
+          'Labour Available',
+          `${labour.firstName} ${labour.lastName} is available ${availabilityRequest.availabilityType} for jobs requiring: ${skillNames}`
+        );
+      }
+    }
+
+  } catch (error) {
+    console.error('Error in findAndNotifyMatchingJobs:', error);
+  }
+};
+
+// Get labour's availability requests
+const getMyAvailabilityRequests = async (req, res) => {
+  try {
+    const labourId = req.user.id;
+    const { status = 'active' } = req.query;
+
+    const query = { labour: labourId };
+    if (status !== 'all') {
+      query.status = status;
+    }
+
+    const requests = await LabourAvailability.find(query)
+      .populate('skills', 'name')
+      .populate('matchedJobs.job', 'title description location jobTiming')
+      .populate('matchedJobs.contractor', 'firstName lastName phoneNumber')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: 'उपलब्धता अनुरोध सफलतापूर्वक प्राप्त किए गए',
+      data: requests
+    });
+
+  } catch (error) {
+    console.error('Error in getMyAvailabilityRequests:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'आंतरिक सर्वर त्रुटि'
+    });
+  }
+};
+
+// Cancel availability request
+const cancelAvailabilityRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const labourId = req.user.id;
+
+    const request = await LabourAvailability.findOne({
+      _id: requestId,
+      labour: labourId,
+      status: 'active'
+    });
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'उपलब्धता अनुरोध नहीं मिला या पहले से रद्द'
+      });
+    }
+
+    request.status = 'cancelled';
+    await request.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'उपलब्धता अनुरोध सफलतापूर्वक रद्द'
+    });
+
+  } catch (error) {
+    console.error('Error in cancelAvailabilityRequest:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'आंतरिक सर्वर त्रुटि'
+    });
+  }
+};
+
+// Get availability status for specific date
+const getAvailabilityStatus = async (req, res) => {
+  try {
+    const { date } = req.query;
+    const labourId = req.user.id;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'तिथि पैरामीटर आवश्यक है (YYYY-MM-DD प्रारूप)'
+      });
+    }
+
+    const requestedDate = new Date(date);
+    if (isNaN(requestedDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'अमान्य तिथि प्रारूप। YYYY-MM-DD का उपयोग करें'
+      });
+    }
+
+    requestedDate.setHours(0, 0, 0, 0);
+
+    const availability = await LabourAvailability.findOne({
+      labour: labourId,
+      availabilityDate: requestedDate,
+      status: 'active'
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'उपलब्धता स्थिति सफलतापूर्वक प्राप्त',
+      data: {
+        date: requestedDate.toISOString().split('T')[0],
+        isAvailable: !!availability,
+        requestId: availability?._id || null,
+        createdAt: availability?.createdAt || null,
+        skills: availability?.skills || []
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in getAvailabilityStatus:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'आंतरिक सर्वर त्रुटि'
+    });
+  }
+};
+
+// Toggle availability for specific date
+const toggleAvailability = async (req, res) => {
+  try {
+    const { availabilityDate, longitude, latitude, address } = req.body;
+    const labourId = req.user.id;
+
+    // Validate input
+    if (!availabilityDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'उपलब्धता तिथि आवश्यक है'
+      });
+    }
+
+    if (!longitude || !latitude) {
+      return res.status(400).json({
+        success: false,
+        message: 'स्थान निर्देशांक आवश्यक हैं'
+      });
+    }
+
+    // Validate date format and ensure it's not in the past
+    const requestedDate = new Date(availabilityDate);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (isNaN(requestedDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'अमान्य तिथि प्रारूप'
+      });
+    }
+
+    if (requestedDate < today) {
+      return res.status(400).json({
+        success: false,
+        message: 'पिछली तिथियों के लिए उपलब्धता टॉगल नहीं कर सकते'
+      });
+    }
+
+    // Get labour details with skills
+    const labour = await User.findById(labourId).populate('skills', 'name');
+    if (!labour) {
+      return res.status(404).json({
+        success: false,
+        message: 'मजदूर नहीं मिला'
+      });
+    }
+
+    if (!labour.skills || labour.skills.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'कोई कौशल नहीं मिला। कृपया पहले अपनी प्रोफ़ाइल में कौशल जोड़ें'
+      });
+    }
+
+    // Normalize the date to start of day
+    requestedDate.setHours(0, 0, 0, 0);
+
+    // Check if already exists
+    const existingRequest = await LabourAvailability.findOne({
+      labour: labourId,
+      availabilityDate: requestedDate,
+      status: 'active'
+    });
+
+    if (existingRequest) {
+      // Toggle off - cancel existing request
+      existingRequest.status = 'cancelled';
+      await existingRequest.save();
+
+      return res.status(200).json({
+        success: true,
+        message: `Availability for ${requestedDate.toDateString()} has been turned OFF`,
+        data: {
+          isAvailable: false,
+          requestId: existingRequest._id,
+          availabilityDate: requestedDate
+        }
+      });
+    } else {
+      // Toggle on - create new request
+      const availabilityRequest = new LabourAvailability({
+        labour: labourId,
+        availabilityDate: requestedDate,
+        availabilityType: 'specific_date',
+        skills: labour.skills.map(skill => skill._id),
+        location: {
+          type: 'Point',
+          coordinates: [parseFloat(longitude), parseFloat(latitude)],
+          address: address || ''
+        }
+      });
+
+      await availabilityRequest.save();
+
+      // Find matching jobs and notify contractors
+      await findAndNotifyMatchingJobs(availabilityRequest);
+
+      return res.status(200).json({
+        success: true,
+        message: `Availability for ${requestedDate.toDateString()} has been turned ON`,
+        data: {
+          isAvailable: true,
+          requestId: availabilityRequest._id,
+          availabilityDate: requestedDate,
+          skills: labour.skills.map(skill => skill.name)
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('Error in toggleAvailability:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'आंतरिक सर्वर त्रुटि'
+    });
+  }
+};
+
+// Get available labourers for contractors by date
+const getAvailableLaboursByDate = async (req, res) => {
+  try {
+    const { date, skills, longitude, latitude, maxDistance = 50000 } = req.query;
+    const contractorId = req.user.id;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'तिथि पैरामीटर आवश्यक है (YYYY-MM-DD प्रारूप)'
+      });
+    }
+
+    if (!skills) {
+      return res.status(400).json({
+        success: false,
+        message: 'कौशल पैरामीटर आवश्यक है'
+      });
+    }
+
+    const requestedDate = new Date(date);
+    if (isNaN(requestedDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'अमान्य तिथि प्रारूप। YYYY-MM-DD का उपयोग करें'
+      });
+    }
+
+    requestedDate.setHours(0, 0, 0, 0);
+
+    const skillNames = Array.isArray(skills) ? skills : skills.split(',');
+    
+    // Find skill ObjectIds by names
+    const skillObjects = await Skill.find({ 
+      name: { $in: skillNames }, 
+      isActive: true 
+    });
+    
+    if (skillObjects.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'कोई वैध कौशल नहीं मिला'
+      });
+    }
+    
+    const skillIds = skillObjects.map(skill => skill._id);
+
+    let query = {
+      status: 'active',
+      availabilityDate: requestedDate,
+      skills: { $in: skillIds }
+    };
+
+    // Add location filter if coordinates provided
+    if (longitude && latitude) {
+      query.location = {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [parseFloat(longitude), parseFloat(latitude)]
+          },
+          $maxDistance: parseInt(maxDistance)
+        }
+      };
+    }
+
+    const availableLabours = await LabourAvailability.find(query)
+      .populate({
+        path: 'labour',
+        model: 'User',
+        select: 'firstName lastName phoneNumber profilePicture'
+      })
+      .populate('skills', 'name nameHindi')
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      message: `Available labourers for ${requestedDate.toDateString()} fetched successfully`,
+      data: {
+        date: requestedDate.toISOString().split('T')[0],
+        count: availableLabours.length,
+        labourers: availableLabours
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in getAvailableLaboursByDate:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'आंतरिक सर्वर त्रुटि'
+    });
+  }
+};
+
+// Get available labourers for contractors (all dates)
+const getAvailableLabours = async (req, res) => {
+  try {
+    console.log('=== getAvailableLabours Debug - UPDATED CODE ===');
+    const { skills, longitude, latitude, maxDistance = 50000 } = req.query;
+    const contractorId = req.user.id;
+    console.log('Skills query:', skills);
+    console.log('Contractor ID:', contractorId);
+
+    if (!skills) {
+      return res.status(400).json({
+        success: false,
+        message: 'कौशल पैरामीटर आवश्यक है'
+      });
+    }
+
+    const skillNames = Array.isArray(skills) ? skills : skills.split(',');
+    console.log('Skill names:', skillNames);
+    
+    // Find skill ObjectIds by names
+    const skillObjects = await Skill.find({ 
+      name: { $in: skillNames }, 
+      isActive: true 
+    });
+    console.log('Found skills:', skillObjects.map(s => ({ name: s.name, id: s._id })));
+    
+    if (skillObjects.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'कोई वैध कौशल नहीं मिला'
+      });
+    }
+    
+    const skillIds = skillObjects.map(skill => skill._id);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    console.log('Today:', today.toISOString());
+
+    let query = {
+      status: 'active',
+      availabilityDate: { $gte: today },
+      skills: { $in: skillIds }
+    };
+    console.log('Query:', JSON.stringify(query, null, 2));
+
+    // Add location filter if coordinates provided
+    if (longitude && latitude) {
+      query.location = {
+        $near: {
+          $geometry: {
+            type: 'Point',
+            coordinates: [parseFloat(longitude), parseFloat(latitude)]
+          },
+          $maxDistance: parseInt(maxDistance)
+        }
+      };
+    }
+
+    console.log('Final query:', JSON.stringify(query, null, 2));
+
+    // First test without populate
+    const rawResults = await LabourAvailability.find(query);
+    console.log('Raw results count:', rawResults.length);
+    if (rawResults.length > 0) {
+      console.log('Sample raw result:', {
+        id: rawResults[0]._id,
+        labour: rawResults[0].labour,
+        availabilityDate: rawResults[0].availabilityDate,
+        skills: rawResults[0].skills,
+        status: rawResults[0].status
+      });
+    }
+
+    const availableLabours = await LabourAvailability.find(query)
+      .populate({
+        path: 'labour',
+        model: 'User',
+        select: 'firstName lastName phoneNumber profilePicture'
+      })
+      .populate('skills', 'name nameHindi')
+      .sort({ availabilityDate: 1, createdAt: -1 });
+
+    console.log('Populated results count:', availableLabours.length);
+    console.log('=== End Debug ===');
+
+    return res.status(200).json({
+      success: true,
+      message: 'उपलब्ध मजदूर सफलतापूर्वक प्राप्त',
+      data: availableLabours
+    });
+
+  } catch (error) {
+    console.error('Error in getAvailableLabours:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'आंतरिक सर्वर त्रुटि'
+    });
+  }
+};
+
+// Get all labour availability requests (Admin only)
+const getAllLabourAvailabilityRequests = async (req, res) => {
+  try {
+    const { status = 'active', page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
+
+    let query = {};
+    if (status !== 'all') {
+      query.status = status;
+    }
+
+    const availabilityRequests = await LabourAvailability.find(query)
+      .populate({
+        path: 'labour',
+        model: 'User',
+        select: 'firstName lastName phoneNumber profilePicture'
+      })
+      .populate('skills', 'name nameHindi category')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await LabourAvailability.countDocuments(query);
+
+    return res.status(200).json({
+      success: true,
+      message: 'मजदूर उपलब्धता अनुरोध सफलतापूर्वक प्राप्त',
+      data: {
+        requests: availabilityRequests,
+        pagination: {
+          current: parseInt(page),
+          pages: Math.ceil(total / limit),
+          total: total
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in getAllLabourAvailabilityRequests:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'आंतरिक सर्वर त्रुटि'
+    });
+  }
+};
+
+module.exports = {
+  submitAvailabilityRequest,
+  getMyAvailabilityRequests,
+  cancelAvailabilityRequest,
+  getAvailableLabours,
+  getAvailableLaboursByDate,
+  getAvailabilityStatus,
+  toggleAvailability,
+  getAllLabourAvailabilityRequests
+};

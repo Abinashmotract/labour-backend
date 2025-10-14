@@ -3,13 +3,13 @@ const Skill = require("../../models/skillModel");
 // Create skill
 const createSkill = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, nameHindi, category } = req.body;
 
-    if (!name) {
+    if (!name || !nameHindi || !category) {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Skill name is required",
+        message: "कौशल नाम, हिंदी नाम और श्रेणी आवश्यक हैं",
       });
     }
 
@@ -21,12 +21,14 @@ const createSkill = async (req, res) => {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "Skill with this name already exists",
+        message: "इस नाम के साथ कौशल पहले से मौजूद है",
       });
     }
 
     const skill = new Skill({
       name: name.toLowerCase().trim(),
+      nameHindi: nameHindi.trim(),
+      category: category.trim(),
     });
 
     await skill.save();
@@ -34,10 +36,12 @@ const createSkill = async (req, res) => {
     return res.status(201).json({
       success: true,
       status: 201,
-      message: "Skill created successfully",
+      message: "कौशल सफलतापूर्वक बनाया गया",
       data: {
         id: skill._id,
         name: skill.name,
+        nameHindi: skill.nameHindi,
+        category: skill.category,
         isActive: skill.isActive,
         createdAt: skill.createdAt,
       },
@@ -47,7 +51,7 @@ const createSkill = async (req, res) => {
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -78,7 +82,7 @@ const getAllSkills = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Skills fetched successfully",
+      message: "कौशल सफलतापूर्वक प्राप्त",
       data: {
         skills,
         totalPages: Math.ceil(total / limit),
@@ -91,7 +95,7 @@ const getAllSkills = async (req, res) => {
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -110,14 +114,14 @@ const getSkillById = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "Skill not found",
+        message: "कौशल नहीं मिला",
       });
     }
 
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Skill fetched successfully",
+      message: "कौशल सफलतापूर्वक प्राप्त",
       data: skill,
     });
   } catch (error) {
@@ -125,7 +129,7 @@ const getSkillById = async (req, res) => {
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -134,7 +138,7 @@ const getSkillById = async (req, res) => {
 const updateSkill = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, category, isActive } = req.body;
+    const { name, nameHindi, category, isActive } = req.body;
 
     const skill = await Skill.findById(id);
 
@@ -142,7 +146,7 @@ const updateSkill = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "Skill not found",
+        message: "कौशल नहीं मिला",
       });
     }
 
@@ -157,15 +161,15 @@ const updateSkill = async (req, res) => {
         return res.status(400).json({
           success: false,
           status: 400,
-          message: "Skill with this name already exists",
+          message: "इस नाम के साथ कौशल पहले से मौजूद है",
         });
       }
     }
 
     // Update fields
     if (name !== undefined) skill.name = name.toLowerCase().trim();
-    if (description !== undefined) skill.description = description;
-    if (category !== undefined) skill.category = category;
+    if (nameHindi !== undefined) skill.nameHindi = nameHindi.trim();
+    if (category !== undefined) skill.category = category.trim();
     if (isActive !== undefined) skill.isActive = isActive;
 
     await skill.save();
@@ -173,11 +177,11 @@ const updateSkill = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Skill updated successfully",
+      message: "कौशल सफलतापूर्वक अपडेट",
       data: {
         id: skill._id,
         name: skill.name,
-        description: skill.description,
+        nameHindi: skill.nameHindi,
         category: skill.category,
         isActive: skill.isActive,
         updatedAt: skill.updatedAt,
@@ -188,7 +192,7 @@ const updateSkill = async (req, res) => {
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -204,7 +208,7 @@ const deleteSkill = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "Skill not found",
+        message: "कौशल नहीं मिला",
       });
     }
 
@@ -213,14 +217,14 @@ const deleteSkill = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Skill deleted successfully",
+      message: "कौशल सफलतापूर्वक हटाया गया",
     });
   } catch (error) {
     console.error("Error in deleteSkill:", error);
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -234,7 +238,7 @@ const deleteMultipleSkills = async (req, res) => {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "skillIds array is required",
+        message: "skillIds सरणी आवश्यक है",
       });
     }
 
@@ -252,7 +256,7 @@ const deleteMultipleSkills = async (req, res) => {
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -268,7 +272,7 @@ const toggleSkillStatus = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "Skill not found",
+        message: "कौशल नहीं मिला",
       });
     }
 
@@ -292,7 +296,7 @@ const toggleSkillStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };

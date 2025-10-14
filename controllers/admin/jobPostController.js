@@ -35,13 +35,13 @@ const createJobPost = async (req, res) => {
     if (!title || !description || !jobTiming || !labourersRequired || !validUntil) {
       return res.status(400).json({
         success: false,
-        message: "All fields (title, description, jobTiming, labourersRequired, validUntil) are required",
+        message: "सभी फ़ील्ड (शीर्षक, विवरण, नौकरी समय, आवश्यक मजदूर, वैध तक) आवश्यक हैं",
       });
     }
     if (!locationData.coordinates || !locationData.coordinates.length === 2) {
       return res.status(400).json({
         success: false,
-        message: "Valid coordinates are required",
+        message: "वैध निर्देशांक आवश्यक हैं",
       });
     }
 
@@ -61,7 +61,7 @@ const createJobPost = async (req, res) => {
     // ✅ Populate job data for notification
     const populatedJob = await JobPost.findById(jobPost._id)
       .populate('contractor', 'firstName lastName')
-      .populate('skills', 'name');
+      .populate('skills', 'name nameHindi');
     try {
       await sendJobNotificationToAllLabours(populatedJob);
       await sendJobNotificationToNearbyLabours(populatedJob, 50000); 
@@ -72,14 +72,14 @@ const createJobPost = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Job post created successfully",
+      message: "नौकरी पोस्ट सफलतापूर्वक बनाया गया",
       data: jobPost,
     });
   } catch (error) {
     console.error("Error in createJobPost:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -116,18 +116,18 @@ const getAllJobPosts = async (req, res) => {
         "contractor",
         "firstName lastName email phoneNumber profilePicture"
       )
-      .populate("skills", "name")
+      .populate("skills", "name nameHindi category")
       .sort({ createdAt: -1 });
     return res.status(200).json({
       success: true,
-      message: "Job posts fetched successfully",
+      message: "नौकरी पोस्ट सफलतापूर्वक प्राप्त",
       data: jobs,
     });
   } catch (error) {
     console.error("Error in getAllJobPosts:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -172,14 +172,14 @@ const getContractorJobs = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Contractor jobs fetched successfully",
+      message: "ठेकेदार नौकरियां सफलतापूर्वक प्राप्त",
       data: jobs,
     });
   } catch (error) {
     console.error("Error in getContractorJobs:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -205,7 +205,7 @@ const updateJobPost = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "Job post not found",
+        message: "नौकरी पोस्ट नहीं मिला",
       });
     }
 
@@ -214,7 +214,7 @@ const updateJobPost = async (req, res) => {
       return res.status(403).json({
         success: false,
         status: 403,
-        message: "Unauthorized: You can only update your own job posts",
+        message: "अनधिकृत: आप केवल अपनी नौकरी पोस्ट अपडेट कर सकते हैं",
       });
     }
 
@@ -223,7 +223,7 @@ const updateJobPost = async (req, res) => {
       return res.status(400).json({
         success: false,
         status: 400,
-        message: "At least 1 labourer is required",
+        message: "कम से कम 1 मजदूर आवश्यक है",
       });
     }
 
@@ -235,7 +235,7 @@ const updateJobPost = async (req, res) => {
         return res.status(400).json({
           success: false,
           status: 400,
-          message: "Valid until date must be in the future",
+          message: "वैध तिथि भविष्य में होनी चाहिए",
         });
       }
     }
@@ -247,7 +247,7 @@ const updateJobPost = async (req, res) => {
         return res.status(400).json({
           success: false,
           status: 400,
-          message: "Some skills are invalid",
+          message: "कुछ कौशल अमान्य हैं",
         });
       }
     }
@@ -282,7 +282,7 @@ const updateJobPost = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Job post updated successfully",
+      message: "नौकरी पोस्ट सफलतापूर्वक अपडेट",
       data: updatedJobPost,
     });
   } catch (error) {
@@ -297,7 +297,7 @@ const updateJobPost = async (req, res) => {
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -311,7 +311,7 @@ const deleteJobPost = async (req, res) => {
       return res.status(404).json({
         success: false,
         status: 404,
-        message: "Job post not found",
+        message: "नौकरी पोस्ट नहीं मिला",
       });
     }
     if (jobPost.contractor.toString() !== req.user.id) {
@@ -330,14 +330,14 @@ const deleteJobPost = async (req, res) => {
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "Job post deleted successfully",
+      message: "नौकरी पोस्ट सफलतापूर्वक हटाया गया",
     });
   } catch (error) {
     console.error("Error in deleteJobPost:", error);
     return res.status(500).json({
       success: false,
       status: 500,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
@@ -351,7 +351,7 @@ const getNearbyJobs = async (req, res) => {
     if (!longitude || !latitude) {
       return res.status(400).json({
         success: false,
-        message: "Longitude and latitude are required",
+        message: "देशांतर और अक्षांश आवश्यक हैं",
       });
     }
     const userLongitude = parseFloat(longitude);
@@ -432,7 +432,7 @@ const getNearbyJobs = async (req, res) => {
     ]);
     return res.status(200).json({
       success: true,
-      message: "Nearby jobs fetched successfully",
+      message: "पास की नौकरियां सफलतापूर्वक प्राप्त",
       data: nearbyJobs,
       count: nearbyJobs.length,
     });
@@ -440,7 +440,7 @@ const getNearbyJobs = async (req, res) => {
     console.error("Error in getNearbyJobs:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
