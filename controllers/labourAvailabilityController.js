@@ -54,19 +54,12 @@ const submitAvailabilityRequest = async (req, res) => {
       validDates.push(requestedDate);
     }
 
-    // Get labour details with skills
-    const labour = await User.findById(labourId).populate('skills', 'name');
+    // Get labour details
+    const labour = await User.findById(labourId);
     if (!labour) {
       return res.status(404).json({
         success: false,
         message: 'मजदूर नहीं मिला'
-      });
-    }
-
-    if (!labour.skills || labour.skills.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'कोई कौशल नहीं मिला। कृपया पहले अपनी प्रोफ़ाइल में कौशल जोड़ें'
       });
     }
 
@@ -102,7 +95,7 @@ const submitAvailabilityRequest = async (req, res) => {
           labour: labourId,
           availabilityDate: requestedDate,
           availabilityType: 'specific_date',
-          skills: labour.skills.map(skill => skill._id),
+          skills: labour.skills && labour.skills.length > 0 ? labour.skills.map(skill => skill._id) : [],
           location: {
             type: 'Point',
             coordinates: labour.location.coordinates,
@@ -134,7 +127,7 @@ const submitAvailabilityRequest = async (req, res) => {
         totalCreated: createdRequests.length,
         totalSkipped: skippedDates.length,
         totalErrors: errors.length,
-        skills: labour.skills.map(skill => skill.name)
+        skills: labour.skills && labour.skills.length > 0 ? labour.skills.map(skill => skill.name) : []
       }
     };
 
@@ -164,12 +157,11 @@ const findAndNotifyMatchingJobs = async (availabilityRequest) => {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Find jobs that match the availability date and skills
-    const matchingJobs = await JobPost.find({
+    // Find jobs that match the availability date and skills (if any)
+    let jobQuery = {
       isActive: true,
       isFilled: false,
       validUntil: { $gte: today },
-      skills: { $in: availabilityRequest.skills },
       location: {
         $near: {
           $geometry: {
@@ -179,7 +171,15 @@ const findAndNotifyMatchingJobs = async (availabilityRequest) => {
           $maxDistance: 50000 // 50km radius
         }
       }
-    }).populate('contractor', 'firstName lastName fcmToken')
+    };
+
+    // Only filter by skills if the labour has skills
+    if (availabilityRequest.skills && availabilityRequest.skills.length > 0) {
+      jobQuery.skills = { $in: availabilityRequest.skills };
+    }
+
+    const matchingJobs = await JobPost.find(jobQuery)
+      .populate('contractor', 'firstName lastName fcmToken')
       .populate('skills', 'name');
 
     console.log(`Found ${matchingJobs.length} matching jobs for labour availability`);
@@ -195,7 +195,9 @@ const findAndNotifyMatchingJobs = async (availabilityRequest) => {
     for (const job of matchingJobs) {
       if (job.contractor.fcmToken) {
         const labour = await User.findById(availabilityRequest.labour);
-        const skillNames = job.skills.map(skill => skill.name).join(', ');
+        const skillNames = job.skills && job.skills.length > 0 
+          ? job.skills.map(skill => skill.name).join(', ')
+          : 'general work';
         
         await sendNotification(
           job.contractor.fcmToken,
