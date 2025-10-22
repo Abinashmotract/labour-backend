@@ -2,7 +2,10 @@ const mongoose = require("mongoose");
 const User = require("../models/userModel");
 const Contracter = require("../models/Contracter");
 const { getAddressFromCoordinates } = require("../utils/geocoding");
-
+const JobApplication = require("../models/jobApplicationModel");
+const LabourAvailability = require("../models/labourAvailabilityModel");
+const Notification = require("../models/notificationModel");
+const JobPost = require("../models/jobPostModel");
 
 // Utility: generate unique referral code
 async function generateUniqueReferralCode(prefix = "AGT", length = 6) {
@@ -273,11 +276,9 @@ const updateRoleBasisUser = async (req, res) => {
   }
 };
 
-
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-
     const user = await User.findByIdAndDelete(id);
     if (!user) {
       return res.status(404).json({
@@ -636,6 +637,30 @@ const getAllLabours = async (req, res) => {
   }
 };
 
+const deleteLabourAccount = async (req, res) => {
+  try {
+    const labourId = req.user.id;
+    await JobApplication.deleteMany({ labour: labourId });
+    await JobPost.updateMany(
+      { "acceptedLabours.labour": labourId },
+      { $pull: { acceptedLabours: { labour: labourId } }, $inc: { labourersFilled: -1 } }
+    );
+    await LabourAvailability.deleteMany({ labour: labourId });
+    await Notification.deleteMany({ recipient: labourId });
+    await User.findByIdAndDelete(labourId);
+    return res.status(200).json({
+      success: true,
+      message: "मजदूर खाता और संबंधित सभी डेटा सफलतापूर्वक हटा दिया गया।"
+    });
+  } catch (error) {
+    console.error("Delete labour account error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "सर्वर में आंतरिक त्रुटि हुई। कृपया बाद में प्रयास करें।"
+    });
+  }
+};
+
 module.exports = {
   getAllUsers,
   toggleContractorAgent,
@@ -648,5 +673,6 @@ module.exports = {
   searchUsers,
   deleteMultipleUsers,
   uploadProfileImage,
-  getLaboursByAgent
+  getLaboursByAgent,
+  deleteLabourAccount
 };
