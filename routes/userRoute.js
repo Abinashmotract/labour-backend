@@ -13,6 +13,7 @@ const {
     uploadProfileImage,
     updateRoleBasisUser,
     getLaboursByAgent,
+    deleteLabourAccount,
 } = require('../controllers/userController');
 const { verifyUser, verifyAdmin, verifyAllToken } = require("../middleware/verifyToken");
 
@@ -22,6 +23,8 @@ const router = express.Router();
 router.get('/me', verifyAllToken(['labour', 'contractor']), getLoggedInUser);
 router.patch('/update-location', verifyAllToken(['labour']), updateLocation);
 router.post('/profile-image', verifyAllToken(['labour', 'contractor']), uploadToLocal, uploadProfileImage);
+
+router.delete('/delete-account', verifyAllToken(['labour']), deleteLabourAccount);
 
 router.get('/labour-details', verifyAllToken(['labour']), getLabourDetailsById);
 
