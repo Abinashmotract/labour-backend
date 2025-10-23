@@ -13,9 +13,25 @@ const createSkill = async (req, res) => {
       });
     }
 
-    const existingSkill = await Skill.findOne({
-      name: name.toLowerCase().trim(),
-    });
+    // normalize incoming name and log for debugging
+    const normalizedName = name.toLowerCase().trim();
+    console.log(`createSkill: received name='${name}' normalized='${normalizedName}'`);
+
+    const existingSkill = await Skill.findOne({ name: normalizedName });
+
+    if (existingSkill) {
+      // log details about the matching skill to help debug duplicate detection
+      try {
+        console.log("createSkill: existingSkill found:", {
+          id: existingSkill._id?.toString(),
+          name: existingSkill.name,
+          nameHindi: existingSkill.nameHindi,
+          category: existingSkill.category,
+        });
+      } catch (logErr) {
+        console.warn("createSkill: failed to log existingSkill details", logErr);
+      }
+    }
 
     if (existingSkill) {
       return res.status(400).json({
