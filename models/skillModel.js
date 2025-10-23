@@ -15,7 +15,7 @@ const skillSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    required: true,
+    // required: true,
     trim: true
   },
   isActive: {
