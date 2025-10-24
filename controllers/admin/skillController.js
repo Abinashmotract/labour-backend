@@ -71,39 +71,45 @@ const createSkill = async (req, res) => {
     });
   }
 };
+
 // Get all skills
 const getAllSkills = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search, isActive } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const isActive = req.query.isActive;
 
     const query = {};
 
-    // Search by name
     if (search) {
+      // Case-insensitive search by name
       query.name = { $regex: search, $options: "i" };
     }
 
-    // Filter by isActive
     if (typeof isActive !== "undefined") {
       query.isActive = isActive === "true";
     }
 
+    // Count total matching records
+    const total = await Skill.countDocuments(query);
+
+    // Fetch paginated records
     const skills = await Skill.find(query)
       .sort({ createdAt: -1 })
-      .skip((page - 1) * parseInt(limit))
-      .limit(parseInt(limit));
-
-    const total = await Skill.countDocuments(query);
+      .skip((page - 1) * limit)
+      .limit(limit);
 
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "कौशल सफलतापूर्वक प्राप्त",
+      message: "कौशल सफलतापूर्वक प्राप्त किए गए",
       data: {
         skills,
-        totalPages: Math.ceil(total / limit),
-        currentPage: parseInt(page),
         total,
+        totalPages: Math.ceil(total / limit),
+        currentPage: page,
+        limit,
       },
     });
   } catch (error) {
@@ -112,6 +118,7 @@ const getAllSkills = async (req, res) => {
       success: false,
       status: 500,
       message: "आंतरिक सर्वर त्रुटि",
+      error: error.message,
     });
   }
 };
