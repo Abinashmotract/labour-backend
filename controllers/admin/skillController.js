@@ -75,41 +75,23 @@ const createSkill = async (req, res) => {
 // Get all skills
 const getAllSkills = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
     const search = req.query.search || "";
     const isActive = req.query.isActive;
-
     const query = {};
-
     if (search) {
-      // Case-insensitive search by name
       query.name = { $regex: search, $options: "i" };
     }
-
     if (typeof isActive !== "undefined") {
       query.isActive = isActive === "true";
     }
-
-    // Count total matching records
-    const total = await Skill.countDocuments(query);
-
-    // Fetch paginated records
-    const skills = await Skill.find(query)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
-
+    const skills = await Skill.find(query).sort({ createdAt: -1 });
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "कौशल सफलतापूर्वक प्राप्त किए गए",
+      message: "सभी कौशल सफलतापूर्वक प्राप्त किए गए",
       data: {
         skills,
-        total,
-        totalPages: Math.ceil(total / limit),
-        currentPage: page,
-        limit,
+        total: skills.length,
       },
     });
   } catch (error) {
