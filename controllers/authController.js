@@ -432,18 +432,19 @@ const resetPassword = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { email, role } = decoded; // Extract role from token
+    const { email, phoneNumber, role } = decoded; // Accept either email or phone-based flow
 
-    if (!email || !role || !['labour', 'contractor'].includes(role)) {
+    if ((!email && !phoneNumber) || !role || !['labour', 'contractor'].includes(role)) {
       return res.status(400).json({
         success: false,
         message: "अमान्य या समाप्त टोकन"
       });
     }
 
-    // 2. Find account based on role
+    // 2. Find account based on role and identifier (email or phone)
     const Model = role === 'labour' ? User : Contracter;
-    const account = await Model.findOne({ email });
+    const query = email ? { email: email.toLowerCase() } : { phoneNumber };
+    const account = await Model.findOne(query);
 
     if (!account) {
       return res.status(404).json({
