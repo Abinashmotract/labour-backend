@@ -347,7 +347,7 @@ const sendEmail = async (req, res, next) => {
 };
 
 const verifyOTP = async (req, res, next) => {
-  const { otp, role, email } = req.body; // Added email for better validation
+  const { otp, role, phoneNumber } = req.body; // Added email for better validation
 
   try {
     // Validate inputs
@@ -376,7 +376,8 @@ const verifyOTP = async (req, res, next) => {
     const account = await Model.findOne({
       otp,
       otpExpiration: { $gt: Date.now() },
-      ...(email && { email: email.toLowerCase() }) // Optional email verification
+      // ...(email && { email: email.toLowerCase() }) // Optional email verification
+      ...(phoneNumber && { phoneNumber: phoneNumber }) // Optional phone number verification
     });
 
     if (!account) {
@@ -396,7 +397,7 @@ const verifyOTP = async (req, res, next) => {
     const token = jwt.sign(
       {
         id: account._id,
-        email: account.email,
+        phoneNumber: account.phoneNumber,
         role: account.role // Include role in token
       },
       process.env.JWT_SECRET,
