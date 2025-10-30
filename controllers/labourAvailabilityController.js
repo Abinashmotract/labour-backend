@@ -2,6 +2,7 @@ const LabourAvailability = require('../models/labourAvailabilityModel');
 const User = require('../models/userModel');
 const JobPost = require('../models/jobPostModel');
 const Skill = require('../models/skillModel');
+const Contracter = require('../models/Contracter');
 const { sendNotification } = require('../utils/notifications');
 
 // Submit availability request for specific date(s)
@@ -636,6 +637,14 @@ const getAvailableLabours = async (req, res) => {
 
     console.log('Final query:', JSON.stringify(query, null, 2));
 
+    // Load contractor profile to enforce work category and optional skills match
+    let contractorProfile = null;
+    try {
+      contractorProfile = await Contracter.findById(contractorId).select('work_category skills');
+    } catch (e) {
+      // ignore if not a contractor profile
+    }
+
     // First test without populate
     const rawResults = await LabourAvailability.find(query);
     console.log('Raw results count:', rawResults.length);
@@ -653,16 +662,31 @@ const getAvailableLabours = async (req, res) => {
       .sort({ availabilityDate: 1, createdAt: -1 });
 
     // Manually populate labour data
-    const populatedLabours = await Promise.all(availableLabours.map(async (labour) => {
-      const labourData = await User.findById(labour.labour).select('firstName lastName phoneNumber profilePicture');
-      const skillsData = await Skill.find({ _id: { $in: labour.skills } }).select('name nameHindi');
-      
+    let populatedLabours = await Promise.all(availableLabours.map(async (labour) => {
+      const labourData = await User.findById(labour.labour).select('firstName lastName phoneNumber profilePicture work_category skills');
+
+      // Prefer availability skills; fall back to labour profile skills when empty
+      const skillsIds = (labour.skills && labour.skills.length > 0) ? labour.skills : (labourData?.skills || []);
+      const skillsData = skillsIds.length > 0 ? await Skill.find({ _id: { $in: skillsIds } }).select('name nameHindi') : [];
+
       return {
         ...labour.toObject(),
         labour: labourData,
         skills: skillsData
       };
     }));
+
+    // Enforce same work category and skill intersection with contractor when available
+    if (contractorProfile?.work_category) {
+      const contractorSkills = Array.isArray(contractorProfile.skills) ? contractorProfile.skills.map(String) : [];
+      populatedLabours = populatedLabours.filter((item) => {
+        const labourCategory = item.labour?.work_category;
+        if (!labourCategory || labourCategory !== contractorProfile.work_category) return false;
+        if (contractorSkills.length === 0) return true; // if contractor has no skills stored, skip skill match
+        const labourSkillIds = (item.skills || []).map((s) => String(s._id));
+        return labourSkillIds.some((id) => contractorSkills.includes(id));
+      });
+    }
 
     console.log('Populated results count:', populatedLabours.length);
     console.log('=== End Debug ===');
