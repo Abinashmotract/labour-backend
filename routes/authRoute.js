@@ -10,28 +10,36 @@ const {
     updateFcmToken,
     forgotPassword
 } = require('../controllers/authController');
-// const { verifyUser, verifyAdmin } = require("../middleware/verifyToken");
-const { uploadToS3 } = require("../config/AWSConfig");
 const rateLimit = require('express-rate-limit');
 const { verifyAllToken } = require("../middleware/verifyToken");
 
-const rateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3,
-  message: "You've made too many requests. Please try again later.",
-  skipSuccessfulRequests: true, // Only count failed attempts
-});
-
 const otpRateLimiter = rateLimit({
-  windowMs: 2 * 60 * 1000,
-  max: 2,
-  message: "You've made too many requests. Please try again later.",
+  windowMs: 2 * 60 * 1000, // 2 minutes
+  max: 2, // Maximum 2 requests per window
+  standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
+  legacyHeaders: false, // Disable `X-RateLimit-*` headers
   skipSuccessfulRequests: true, // Only count failed attempts
+  handler: (req, res) => {
+    // Try to get reset time from rate limit info, fallback to window duration
+    let retryAfterSeconds = 120; // Default 2 minutes
+    if (req.rateLimit && req.rateLimit.resetTime) {
+      retryAfterSeconds = Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000);
+    }
+    
+    const retryAfterMinutes = Math.ceil(retryAfterSeconds / 60);
+    
+    return res.status(429).json({
+      success: false,
+      message: `बहुत अधिक OTP अनुरोध। कृपया ${retryAfterMinutes} मिनट बाद पुनः प्रयास करें।`,
+      retryAfter: retryAfterSeconds,
+      retryAfterMinutes: retryAfterMinutes
+    });
+  }
 });
 
 const router = express.Router();
 // ---------labour--------------
-router.post('/labour/signup', uploadToS3, roleBasisSignUp);
+router.post('/labour/signup', roleBasisSignUp);
 router.post('/labour/verify-otp', verifyOtp);
 router.post('/labour/send-otp', otpRateLimiter, sendOTP);
 router.post("/update-fcmtoken", verifyAllToken(["labour", "contractor"]), updateFcmToken);
