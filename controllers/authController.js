@@ -6,62 +6,55 @@ const jwt = require("jsonwebtoken");
 const argon2 = require("argon2");
 const Contracter = require("../models/Contracter");
 const { getAddressFromCoordinates } = require("../utils/geocoding");
-const twilio = require("twilio");
-
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
 
 // Function to send OTP (static for now, replace with actual logic)
 const sendOTP = async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, userId } = req.body;
 
-    if (!phoneNumber) {
+    if (!phoneNumber && !userId) {
       return res.status(400).json({
         success: false,
-        message: "फोन नंबर आवश्यक है",
+        message: "फोन नंबर या यूजर आईडी आवश्यक है",
       });
     }
 
-    // Random 6-digit OTP generate करें
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 मिनट validity
+    const otp = "888888"; // static for now
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 min valid
 
-    // User find करें या create करें
-    let user = await User.findOne({ phoneNumber });
-    if (!user) {
-      user = new User({ phoneNumber });
+    let user;
+    if (phoneNumber) {
+      user = await User.findOne({ phoneNumber });
+      if (!user) {
+        // agar user exist nahi hai to new create karo
+        user = new User({ phoneNumber });
+      }
+    } else if (userId) {
+      user = await User.findById(userId);
     }
 
-    // OTP save करें
+    if (!user) {
+      return res.status(404).json({ success: false, message: "उपयोगकर्ता नहीं मिला" });
+    }
+
+    // Save OTP in DB
     user.otp = otp;
     user.otpExpiry = otpExpiry;
     await user.save();
 
-    await twilioClient.messages.create({
-      body: `आपका OTP है: ${otp} (5 मिनट के लिए वैध)`,
-      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
-      to: `+91${phoneNumber}`, 
-    });
-
     return res.status(200).json({
       success: true,
-      message: "OTP सफलतापूर्वक भेजा गया!",
-      otp,
+      message: "OTP सफलतापूर्वक भेजा गया",
+      otp // ⚠️ testing only, remove later
     });
-
   } catch (err) {
-    console.error("Twilio Send OTP Error:", err);
+    console.error("Send OTP Error:", err);
     return res.status(500).json({
       success: false,
-      message: "OTP भेजने में समस्या हुई",
-      error: err.message,
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
-
 // Function to verify OTP
 const verifyOtp = async (req, res) => {
   try {
