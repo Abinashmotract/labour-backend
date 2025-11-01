@@ -586,125 +586,123 @@ const getAvailableLaboursByDate = async (req, res) => {
 // Get available labourers for contractors (all dates)
 const getAvailableLabours = async (req, res) => {
   try {
-    console.log('=== getAvailableLabours Debug - UPDATED CODE ===');
-    const { skills, longitude, latitude, maxDistance = 50000 } = req.query;
-    const contractorId = req.user.id;
-    console.log('Skills query:', skills);
-    console.log('Contractor ID:', contractorId);
+    console.log("=== getAvailableLabours - Advanced Filters ===");
 
+    const contractorId = req.user.id;
+    const {
+      latitude,
+      longitude,
+      maxDistance = 15000,
+      skillId,
+      work_category,
+      availabilityDate
+    } = req.query;
+
+    // ✅ Validate lat/lon
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: "Latitude and longitude are required.",
+      });
+    }
+
+    // ✅ Fetch contractor (for category match fallback)
+    const contractor = await User.findById(contractorId).select("work_category");
+    if (!contractor) {
+      return res.status(404).json({
+        success: false,
+        message: "Contractor not found.",
+      });
+    }
+
+    // ✅ Prepare date range
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    console.log('Today:', today.toISOString());
 
+    const selectedDate = availabilityDate ? new Date(availabilityDate) : today;
+
+    // ✅ Base query
     let query = {
-      status: 'active',
-      availabilityDate: { $gte: today },
-      isAvailable: true
-    };
-
-    // Only filter by skills if skills parameter is provided
-    if (skills) {
-      const skillNames = Array.isArray(skills) ? skills : skills.split(',');
-      console.log('Skill names:', skillNames);
-      
-      // Find skill ObjectIds by names
-      const skillObjects = await Skill.find({ 
-        name: { $in: skillNames }, 
-        isActive: true 
-      });
-      console.log('Found skills:', skillObjects.map(s => ({ name: s.name, id: s._id })));
-      
-      if (skillObjects.length > 0) {
-        const skillIds = skillObjects.map(skill => skill._id);
-        query.skills = { $in: skillIds };
-      }
-    }
-    
-    console.log('Query:', JSON.stringify(query, null, 2));
-
-    // Add location filter if coordinates provided
-    if (longitude && latitude) {
-      query.location = {
+      status: "active",
+      isAvailable: true,
+      availabilityDate: { $gte: selectedDate },
+      location: {
         $near: {
           $geometry: {
-            type: 'Point',
-            coordinates: [parseFloat(longitude), parseFloat(latitude)]
+            type: "Point",
+            coordinates: [parseFloat(longitude), parseFloat(latitude)],
           },
-          $maxDistance: parseInt(maxDistance)
-        }
-      };
-    }
+          $maxDistance: parseInt(maxDistance), // meters
+        },
+      },
+    };
 
-    console.log('Final query:', JSON.stringify(query, null, 2));
+    // ✅ Optional filters
+    if (skillId) query.skills = { $in: [skillId] };
+    if (work_category) query.work_category = work_category;
 
-    // Load contractor profile to enforce work category and optional skills match
-    let contractorProfile = null;
-    try {
-      contractorProfile = await Contracter.findById(contractorId).select('work_category skills');
-    } catch (e) {
-      // ignore if not a contractor profile
-    }
+    console.log("MongoDB Query:", JSON.stringify(query, null, 2));
 
-    // First test without populate
-    const rawResults = await LabourAvailability.find(query);
-    console.log('Raw results count:', rawResults.length);
-    if (rawResults.length > 0) {
-      console.log('Sample raw result:', {
-        id: rawResults[0]._id,
-        labour: rawResults[0].labour,
-        availabilityDate: rawResults[0].availabilityDate,
-        skills: rawResults[0].skills,
-        status: rawResults[0].status
-      });
-    }
-
-    const availableLabours = await LabourAvailability.find(query)
+    // ✅ Fetch nearby available labours
+    const labourAvailabilityList = await LabourAvailability.find(query)
       .sort({ availabilityDate: 1, createdAt: -1 });
 
-    // Manually populate labour data
-    let populatedLabours = await Promise.all(availableLabours.map(async (labour) => {
-      const labourData = await User.findById(labour.labour).select('firstName lastName phoneNumber profilePicture work_category skills');
+    console.log("Available labours found:", labourAvailabilityList.length);
 
-      // Prefer availability skills; fall back to labour profile skills when empty
-      const skillsIds = (labour.skills && labour.skills.length > 0) ? labour.skills : (labourData?.skills || []);
-      const skillsData = skillsIds.length > 0 ? await Skill.find({ _id: { $in: skillsIds } }).select('name nameHindi') : [];
+    // ✅ Populate user + skill info
+    let populatedLabours = await Promise.all(
+      labourAvailabilityList.map(async (availability) => {
+        const labourData = await User.findById(availability.labour).select(
+          "firstName lastName phoneNumber profilePicture work_category skills location"
+        );
 
-      return {
-        ...labour.toObject(),
-        labour: labourData,
-        skills: skillsData
-      };
-    }));
+        if (!labourData) return null;
 
-    // Enforce same work category and skill intersection with contractor when available
-    if (contractorProfile?.work_category) {
-      const contractorSkills = Array.isArray(contractorProfile.skills) ? contractorProfile.skills.map(String) : [];
-      populatedLabours = populatedLabours.filter((item) => {
-        const labourCategory = item.labour?.work_category;
-        if (!labourCategory || labourCategory !== contractorProfile.work_category) return false;
-        if (contractorSkills.length === 0) return true; // if contractor has no skills stored, skip skill match
-        const labourSkillIds = (item.skills || []).map((s) => String(s._id));
-        return labourSkillIds.some((id) => contractorSkills.includes(id));
-      });
+        const skillsIds = availability.skills?.length > 0
+          ? availability.skills
+          : labourData.skills || [];
+
+        const skillsData = skillsIds.length
+          ? await Skill.find({ _id: { $in: skillsIds } }).select("name nameHindi")
+          : [];
+
+        return {
+          ...availability.toObject(),
+          labour: labourData,
+          skills: skillsData,
+        };
+      })
+    );
+
+    // ✅ Remove nulls (if any labour deleted)
+    populatedLabours = populatedLabours.filter(Boolean);
+
+    // ✅ If work_category not passed, filter by contractor category
+    if (!work_category) {
+      populatedLabours = populatedLabours.filter(
+        (item) =>
+          item.labour?.work_category &&
+          item.labour.work_category === contractor.work_category
+      );
     }
 
-    console.log('Populated results count:', populatedLabours.length);
-    console.log('=== End Debug ===');
+    console.log("Filtered count (final):", populatedLabours.length);
 
     return res.status(200).json({
       success: true,
-      message: 'उपलब्ध मजदूर सफलतापूर्वक प्राप्त',
-      data: populatedLabours
+      message: "उपलब्ध मजदूर सफलतापूर्वक प्राप्त",
+      count: populatedLabours.length,
+      data: populatedLabours,
     });
-
   } catch (error) {
-    console.error('Error in getAvailableLabours:', error);
+    console.error("❌ Error in getAvailableLabours:", error);
     return res.status(500).json({
       success: false,
-      message: 'आंतरिक सर्वर त्रुटि'
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
+
 
 // Get all labour availability requests (Admin only)
 const getAllLabourAvailabilityRequests = async (req, res) => {
