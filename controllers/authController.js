@@ -40,17 +40,16 @@ const sendOTP = async (req, res) => {
     user.otpExpiry = otpExpiry;
     await user.save();
 
-    // ✅ Twilio से OTP भेजें (Messaging Service SID का उपयोग करें)
     await twilioClient.messages.create({
       body: `आपका OTP है: ${otp} (5 मिनट के लिए वैध)`,
-      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID, // ✅ Use MG SID
-      to: `+91${phoneNumber}`, // Indian number format
+      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+      to: `+91${phoneNumber}`, 
     });
 
     return res.status(200).json({
       success: true,
       message: "OTP सफलतापूर्वक भेजा गया!",
-      otp, // ⚠️ सिर्फ टेस्टिंग के लिए, प्रोडक्शन में हटा दें
+      otp,
     });
 
   } catch (err) {
