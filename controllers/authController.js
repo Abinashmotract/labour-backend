@@ -6,7 +6,12 @@ const jwt = require("jsonwebtoken");
 const argon2 = require("argon2");
 const Contracter = require("../models/Contracter");
 const { getAddressFromCoordinates } = require("../utils/geocoding");
-const { sendSMS } = require("../utils/awsSNS");
+const twilio = require("twilio");
+
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 // Function to send OTP
 const sendOTP = async (req, res) => {
@@ -35,12 +40,12 @@ const sendOTP = async (req, res) => {
     user.otpExpiry = otpExpiry;
     await user.save();
 
-    // Format phone number to E.164 format (+91XXXXXXXXXX)
-    const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+91${phoneNumber}`;
-    const message = `आपका OTP है: ${otp} (5 मिनट के लिए वैध)`;
-
-    // Send OTP via AWS SNS
-    await sendSMS(formattedPhone, message);
+    // Send OTP via Twilio
+    await twilioClient.messages.create({
+      body: `आपका OTP है: ${otp} (5 मिनट के लिए वैध)`,
+      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+      to: `+91${phoneNumber}`, 
+    });
 
     return res.status(200).json({
       success: true,
@@ -48,7 +53,7 @@ const sendOTP = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Send OTP Error:", err);
+    console.error("Twilio Send OTP Error:", err);
     return res.status(500).json({
       success: false,
       message: "आंतरिक सर्वर त्रुटि",
@@ -528,12 +533,12 @@ const forgotPassword = async (req, res, next) => {
     account.otpExpiration = now + 15 * 60 * 1000; // 15 minutes expiry
     await account.save();
 
-    // Format phone number to E.164 format (+91XXXXXXXXXX)
-    const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+91${phoneNumber}`;
-    const message = `आपका OTP है: ${otp} (15 मिनट के लिए वैध)`;
-
-    // Send OTP via AWS SNS
-    await sendSMS(formattedPhone, message);
+    // Send OTP via Twilio
+    await twilioClient.messages.create({
+      body: `आपका OTP है: ${otp} (15 मिनट के लिए वैध)`,
+      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+      to: `+91${phoneNumber}`, 
+    });
 
     return res.status(200).json({
       success: true,
