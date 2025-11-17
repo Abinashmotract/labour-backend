@@ -4,7 +4,7 @@ const multer = require("multer");
 const storage = multer.memoryStorage();
 const upload = multer({
     storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    limits: { fileSize: 5 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         if (file.mimetype.startsWith('image/')) cb(null, true);
         else cb(new Error('Only image files are allowed!'), false);
@@ -35,7 +35,6 @@ const uploadToS3 = (req, res, next) => {
                 });
                 req.fileLocations.profilePicture = `https://${config.bucketName}.s3.${config.region}.amazonaws.com/${fileKey}`;
             }
-
             if (req.files['documents']) {
                 req.fileLocations.documents = [];
                 for (const file of req.files['documents']) {
@@ -49,11 +48,9 @@ const uploadToS3 = (req, res, next) => {
                     req.fileLocations.documents.push(`https://${config.bucketName}.s3.${config.region}.amazonaws.com/${fileKey}`);
                 }
             }
-
         } catch (uploadError) {
             console.error("AWS upload error:", uploadError);
         }
-
         next();
     });
 };
