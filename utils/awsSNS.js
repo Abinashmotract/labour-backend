@@ -1,9 +1,8 @@
 // utils/awsSNS.js
 const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
-const crypto = require('crypto');
-const User = require("../models/userModel");
+require('dotenv').config();
 
-const snsClient = new SNSClient({ 
+const snsClient = new SNSClient({
   region: process.env.AWS_REGION,
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -11,81 +10,26 @@ const snsClient = new SNSClient({
   }
 });
 
-const sendOTPMobile = async (phoneNumber) => {
+async function sendSMS(phone, message) {
   try {
-    const otp = crypto.randomInt(100000, 999999).toString();
-    const message = `Your OTP is ${otp}. Valid for 5 minutes.`;
-
-    await User.findOneAndUpdate(
-      { phoneNumber },
-      { 
-        otp,
-        otpExpiresAt: new Date(Date.now() + 5 * 60 * 1000),
-        otpAttempts: 0 
-      },
-      { upsert: true }
-    );
-
-    // 3. Send via AWS SNS
     const params = {
       Message: message,
-      PhoneNumber: phoneNumber, // Include country code (+1XXXXXXXXXX)
+      PhoneNumber: phone, // E.164 format: +919876543210
       MessageAttributes: {
-        'AWS.SNS.SMS.SenderID': {
-          DataType: 'String',
-          StringValue: 'YOURAPP'
+        "AWS.SNS.SMS.SMSType": {
+          DataType: "String",
+          StringValue: "Transactional" // OR 'Promotional'
         }
       }
     };
 
-    const response = await snsClient.send(new PublishCommand(params));
-    return { success: true, messageId: response.MessageId };
-
-  } catch (error) {
-    console.error("AWS SNS error:", error);
-    return { success: false, error: error.message };
+    const result = await snsClient.send(new PublishCommand(params));
+    console.log("SMS Sent:", result);
+    return result;
+  } catch (err) {
+    console.error("SMS Error:", err);
+    throw err;
   }
-};
+}
 
-// Verify OTP
-const verifyOTPMobile = async (phoneNumber, code) => {
-  try {
-    // 1. Find user and check OTP
-    const user = await User.findOne({ phoneNumber });
-    if (!user) return { success: false, error: "User not found" };
-
-    if (user.otpAttempts >= 3) {
-      return { success: false, error: "Max attempts reached" };
-    }
-    if (user.otpExpiresAt < new Date()) {
-      return { success: false, error: "OTP expired" };
-    }
-
-    // 3. Verify code
-    if (user.otp !== code) {
-      await User.updateOne(
-        { phoneNumber },
-        { $inc: { otpAttempts: 1 } }
-      );
-      return { success: false, error: "Invalid OTP" };
-    }
-
-    // 4. Mark as verified on success
-    await User.updateOne(
-      { phoneNumber },
-      { 
-        isPhoneVerified: true,
-        otp: null,
-        otpAttempts: 0 
-      }
-    );
-
-    return { success: true };
-
-  } catch (error) {
-    console.error("Verification error:", error);
-    return { success: false, error: error.message };
-  }
-};
-
-module.exports = { sendOTPMobile, verifyOTPMobile };
+module.exports = { sendSMS };
