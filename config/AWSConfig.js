@@ -18,17 +18,12 @@ const uploadToS3 = (req, res, next) => {
     ]);
 
     uploader(req, res, async (err) => {
-        console.log("req.files:", req.files);
-        console.log("req.body:", req.body);
-
         if (err) return res.status(400).json({ error: err.message });
-
         try {
             const { s3Client, config } = await getS3Client();
 
             req.fileLocations = {};
 
-            // Single profilePicture
             if (req.files['profilePicture'] && req.files['profilePicture'][0]) {
                 const file = req.files['profilePicture'][0];
                 const fileKey = `profile/${Date.now()}-${file.originalname}`;
@@ -41,7 +36,6 @@ const uploadToS3 = (req, res, next) => {
                 req.fileLocations.profilePicture = `https://${config.bucketName}.s3.${config.region}.amazonaws.com/${fileKey}`;
             }
 
-            // Multiple documents
             if (req.files['documents']) {
                 req.fileLocations.documents = [];
                 for (const file of req.files['documents']) {
