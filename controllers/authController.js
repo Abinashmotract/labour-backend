@@ -19,11 +19,8 @@ const sendOTP = async (req, res) => {
         message: "फोन नंबर या यूजर आईडी आवश्यक है",
       });
     }
-
-    // 1. OTP generate (6 digit)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 min valid
-
     let user;
     if (phoneNumber) {
       user = await User.findOne({ phoneNumber });
@@ -140,13 +137,33 @@ const roleBasisSignUp = async (req, res) => {
       lng,
       referralCode
     } = req.body;
-    const user = await User.findOne({ phoneNumber });
-    if (!user || !user.isPhoneVerified) {
+
+    // const user = await User.findOne({ phoneNumber });
+    // if (!user || !user.isPhoneVerified) {
+    //   return res.status(400).json({ success: false, message: "फोन सत्यापित नहीं है" });
+    // }
+    // if (user.email) {
+    //   return res.status(400).json({ success: false, message: "उपयोगकर्ता पहले से पंजीकृत है" });
+    // }
+    if (!phoneNumber || !role) {
+      return res.status(400).json({ success: false, message: "फोन नंबर और भूमिका आवश्यक हैं" });
+    }
+    // 🔥 Check if verified OTP exists
+    const otpVerifiedUser = await User.findOne({ phoneNumber, isPhoneVerified: true });
+    if (!otpVerifiedUser) {
       return res.status(400).json({ success: false, message: "फोन सत्यापित नहीं है" });
     }
-    if (user.email) {
-      return res.status(400).json({ success: false, message: "उपयोगकर्ता पहले से पंजीकृत है" });
+    // 🔥 Check if already registered with same role
+    const existingSameRole = await User.findOne({ phoneNumber, role });
+    if (existingSameRole && existingSameRole.email) {
+      return res.status(400).json({
+        success: false,
+        message: `${role} इस फोन नंबर के साथ पहले से पंजीकृत है`
+      });
     }
+    // 🔥 Create new user record OR use partially created record
+    let user = existingSameRole ? existingSameRole : new User({ phoneNumber, role });
+
     const hashedPassword = await argon2.hash(password);
     user.firstName = firstName;
     user.lastName = lastName;
