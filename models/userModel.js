@@ -35,4 +35,4 @@ const UserSchema = new Schema(
   { timestamps: true }
 );
 UserSchema.index({ location: "2dsphere" }); // ✅ for geo-queries
-module.exports = mongoose.model('labour', UserSchema);
+module.exports = mongoose.model('users', UserSchema);

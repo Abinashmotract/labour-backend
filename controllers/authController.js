@@ -6,47 +6,65 @@ const jwt = require("jsonwebtoken");
 const argon2 = require("argon2");
 const Contracter = require("../models/Contracter");
 const { getAddressFromCoordinates } = require("../utils/geocoding");
-const { sendSMS } = require("../utils/awsSNS");
+const { sendOtpSms } = require("../utils/twilio");
 
 // Function to send OTP
 const sendOTP = async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
+    const { phoneNumber, userId } = req.body;
 
-    if (!phoneNumber) {
+    if (!phoneNumber && !userId) {
       return res.status(400).json({
         success: false,
         message: "फोन नंबर या यूजर आईडी आवश्यक है",
       });
     }
 
-    // Random 6-digit OTP generate करें
+    // 1. OTP generate (6 digit)
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 मिनट validity
+    const otpExpiry = new Date(Date.now() + 5 * 60 * 1000); // 5 min valid
 
-    // User find करें या create करें
-    let user = await User.findOne({ phoneNumber });
+    let user;
+    if (phoneNumber) {
+      user = await User.findOne({ phoneNumber });
+      if (!user) {
+        // agar user exist nahi hai to new create karo
+        user = new User({ phoneNumber });
+      }
+    } else if (userId) {
+      user = await User.findById(userId);
+    }
+
     if (!user) {
       return res.status(404).json({ success: false, message: "उपयोगकर्ता नहीं मिला" });
     }
 
-    // OTP save करें
+    // 2. Save OTP in DB
     user.otp = otp;
     user.otpExpiry = otpExpiry;
     await user.save();
 
-    // Format phone number to E.164 format (+91XXXXXXXXXX)
-    const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+91${phoneNumber}`;
+    // 3. Format phone number (+91XXXXXXXXXX)
+    const formattedPhone = phoneNumber.startsWith("+")
+      ? phoneNumber
+      : `+91${phoneNumber}`;
+
     const message = `आपका OTP है: ${otp} (5 मिनट के लिए वैध)`;
 
-    // Send OTP via AWS SNS
-    await sendSMS(formattedPhone, message);
+    // 4. Send OTP via Twilio
+    const result = await sendOtpSms(formattedPhone, message);
+
+    if (!result.success) {
+      return res.status(429).json({
+        success: false,
+        message: result.error || "OTP भेजने में त्रुटि हुई",
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      message: "OTP सफलतापूर्वक भेजा गया"
+      message: "OTP सफलतापूर्वक भेजा गया",
     });
-
   } catch (err) {
     console.error("Send OTP Error:", err);
     return res.status(500).json({
@@ -55,6 +73,8 @@ const sendOTP = async (req, res) => {
     });
   }
 };
+
+
 // Function to verify OTP
 const verifyOtp = async (req, res) => {
   try {
@@ -71,31 +91,36 @@ const verifyOtp = async (req, res) => {
     if (!user.otp || user.otp !== otp) {
       return res.status(400).json({ success: false, message: "अमान्य OTP" });
     }
-    if (!user.otpExpiry || user.otpExpiry < new Date()) {
+    const expiry = user.otpExpiry || user.otpExpiration;
+    if (!expiry || expiry < new Date()) {
       return res.status(400).json({ success: false, message: "OTP समाप्त हो गया" });
     }
+
     user.isPhoneVerified = true;
     user.otp = undefined;
     user.otpExpiry = undefined;
+
     if (user.createdByAdmin && user.email && user.firstName) {
       user.signupComplete = true;
     }
+
     await user.save();
+
     return res.json({
       success: true,
       message: "फोन सफलतापूर्वक सत्यापित हो गया",
       data: {
         userId: user._id,
         phoneNumber: user.phoneNumber,
-        signupComplete: user.signupComplete
-      }
+        signupComplete: user.signupComplete,
+      },
     });
-
   } catch (err) {
     console.error("Verify OTP Error:", err);
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 // user signup
 const roleBasisSignUp = async (req, res) => {
@@ -163,6 +188,10 @@ const roleBasisSignUp = async (req, res) => {
       } catch (err) {
         console.warn("Reverse geocoding failed:", err.message);
       }
+    }
+    // ✅ Save uploaded profile picture URL (from S3 middleware)
+    if (req.fileLocations && req.fileLocations.profilePicture) {
+      user.profilePicture = req.fileLocations.profilePicture;
     }
     await user.save();
     return res.status(201).json({
@@ -531,9 +560,9 @@ const forgotPassword = async (req, res, next) => {
     // Format phone number to E.164 format (+91XXXXXXXXXX)
     const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+91${phoneNumber}`;
     const message = `आपका OTP है: ${otp} (15 मिनट के लिए वैध)`;
-
     // Send OTP via AWS SNS
-    await sendSMS(formattedPhone, message);
+    // await sendSMS(formattedPhone, message);
+    const result = await sendOtpSms(formattedPhone, message);
 
     return res.status(200).json({
       success: true,
@@ -544,7 +573,7 @@ const forgotPassword = async (req, res, next) => {
     console.error("Forgot password error:", error);
     return res.status(500).json({
       success: false,
-      message: "आंतरिक सर्वर त्रुटि"
+      message: result.error || "OTP भेजने में त्रुटि हुई",
     });
   }
 };

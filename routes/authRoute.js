@@ -10,6 +10,7 @@ const {
     updateFcmToken,
     forgotPassword
 } = require('../controllers/authController');
+const { uploadToLocal } = require("../config/multerLocal");
 const rateLimit = require('express-rate-limit');
 const { verifyAllToken } = require("../middleware/verifyToken");
 
@@ -39,7 +40,7 @@ const otpRateLimiter = rateLimit({
 
 const router = express.Router();
 // ---------labour--------------
-router.post('/labour/signup', roleBasisSignUp);
+router.post('/labour/signup', uploadToLocal, roleBasisSignUp);
 router.post('/labour/verify-otp', verifyOtp);
 router.post('/labour/send-otp', otpRateLimiter, sendOTP);
 router.post("/update-fcmtoken", verifyAllToken(["labour", "contractor"]), updateFcmToken);

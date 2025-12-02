@@ -1,42 +1,52 @@
+// utils/twilio.js
 const User = require("../models/userModel");
-const twilio = require('twilio');
+const twilio = require("twilio");
+
 const client = twilio(
   process.env.TWILIO_ACCOUNT_SID,
   process.env.TWILIO_AUTH_TOKEN
 );
 
-
-// Modified sendOTP function with delay check
-const sendOTP = async (phoneNumber) => {
+/**
+ * Twilio se OTP SMS bhejna + basic cooldown per number
+ * OTP verify hum apne DB se karenge (Twilio se nahi)
+ */
+const sendOtpSms = async (phoneNumber, message) => {
   try {
-    // 1. Find user and check delay
-    const user = await User.findOne({ phoneNumber });
     const now = new Date();
     const cooldownPeriod = 2 * 60 * 1000; // 2 minutes
 
-    if (user?.lastOtpRequest && (now - user.lastOtpRequest < cooldownPeriod)) {
-      const remainingTime = Math.ceil((cooldownPeriod - (now - user.lastOtpRequest)) / 1000);
-      throw new Error(`Please wait ${remainingTime} seconds before requesting a new OTP`);
+    // user record se cooldown check (optional but useful)
+    const user = await User.findOne({ phoneNumber });
+
+    if (user?.lastOtpRequest && now - user.lastOtpRequest < cooldownPeriod) {
+      const remainingSeconds = Math.ceil(
+        (cooldownPeriod - (now - user.lastOtpRequest)) / 1000
+      );
+      throw new Error(
+        `कृपया नया OTP मंगाने से पहले ${remainingSeconds} सेकंड इंतज़ार करें`
+      );
     }
 
-    // 2. Send OTP via Twilio
-    const verification = await client.verify.v2.services(process.env.TWILIO_VERIFY_SERVICE_SID)
-      .verifications
-      .create({ to: phoneNumber, channel: 'sms' });
+    // Twilio Messaging Service se SMS send
+    await client.messages.create({
+      to: phoneNumber,
+      messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
+      body: message,
+    });
 
-    // 3. Update user record
-    await User.findOneAndUpdate(
-      { phoneNumber },
-      { 
-        lastOtpRequest: now,
-        $inc: { otpAttempts: 1 } 
-      },
-      { upsert: true }
-    );
+    // Cooldown + attempts update
+    if (user) {
+      user.lastOtpRequest = now;
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+      await user.save();
+    }
 
     return { success: true };
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Twilio SMS Error:", error);
     return { success: false, error: error.message };
   }
 };
+
+module.exports = { sendOtpSms };
