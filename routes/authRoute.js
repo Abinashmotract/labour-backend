@@ -2,7 +2,7 @@ const express = require("express");
 const {
     roleBasisSignUp,
     sendEmail,
-    verifyOTP,
+    verifyForgotOtp,
     resetPassword,
     login,
     sendOTP,
@@ -48,7 +48,7 @@ router.post("/update-fcmtoken", verifyAllToken(["labour", "contractor"]), update
 // ---------labour--------------
 
 router.post('/send-email', otpRateLimiter, sendEmail);
-router.post('/verify-otp', verifyOTP);
+router.post('/verify-otp', verifyForgotOtp);
 router.post('/reset-password', resetPassword);
 router.post('/forgot-password', otpRateLimiter, forgotPassword);
 router.post('/login', login);

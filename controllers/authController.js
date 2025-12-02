@@ -387,122 +387,144 @@ const sendEmail = async (req, res, next) => {
   }
 };
 
-const verifyOTP = async (req, res, next) => {
-  const { otp, role, phoneNumber } = req.body; // Added email for better validation
-
+// Forgot password for contractors using phone number
+const forgotPassword = async (req, res) => {
+  const { phoneNumber, role } = req.body;
   try {
-    // Validate inputs
-    if (!otp || !role || !['labour', 'contractor'].includes(role)) {
+    if (!phoneNumber) {
       return res.status(400).json({
         success: false,
-        message: "OTP गुम है या अमान्य भूमिका निर्दिष्ट"
+        message: "फोन नंबर आवश्यक है"
       });
     }
-
-    // Check if OTP is already being verified (prevent race conditions)
-    if (activeLocks.has(otp)) {
+    if (!role || !["labour", "contractor"].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "अमान्य भूमिका निर्दिष्ट। 'मजदूर' या 'ठेकेदार' होना चाहिए"
+      });
+    }
+    const account = await User.findOne({ phoneNumber, role });
+    if (!account) {
+      return res.status(404).json({
+        success: false,
+        message: `${role} इस फोन नंबर के साथ नहीं मिला`
+      });
+    }
+    const now = Date.now();
+    if (account.otpExpiration && account.otpExpiration > now) {
+      const remainingTime = Math.ceil((account.otpExpiration - now) / (60 * 1000));
       return res.status(429).json({
         success: false,
-        message: "OTP सत्यापन पहले से चल रहा है। कृपया प्रतीक्षा करें।"
+        message: `कृपया नया OTP अनुरोध करने से पहले ${remainingTime} मिनट प्रतीक्षा करें`
       });
     }
-
-    // Acquire lock
-    activeLocks.set(otp, true);
-
-    // Determine which model to query based on role
-    const Model = role === 'labour' ? User : Contracter;
-
-    // Find account with matching OTP that isn't expired
-    const account = await Model.findOne({
-      otp,
-      otpExpiration: { $gt: Date.now() },
-      // ...(email && { email: email.toLowerCase() }) // Optional email verification
-      ...(phoneNumber && { phoneNumber: phoneNumber }) // Optional phone number verification
-    });
-
-    if (!account) {
-      activeLocks.delete(otp); // Release lock before returning
-      return res.status(400).json({
-        success: false,
-        message: "अमान्य या समाप्त OTP"
-      });
-    }
-
-    // Clear OTP fields
-    account.otp = undefined;
-    account.otpExpiration = undefined;
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    account.otp = otp;
+    account.otpExpiration = now + 15 * 60 * 1000;
     await account.save();
 
-    // Generate JWT token with role
-    const token = jwt.sign(
-      {
-        id: account._id,
-        phoneNumber: account.phoneNumber,
-        role: account.role // Include role in token
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '15m' }
-    );
+    const formattedPhone = phoneNumber.startsWith("+") ? phoneNumber : `+91${phoneNumber}`;
+    const message = `आपका OTP है: ${otp} (15 मिनट के लिए वैध)`;
+    const result = await sendOtpSms(formattedPhone, message);
 
-    // Release lock
-    activeLocks.delete(otp);
-
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: result.error || "OTP भेजने में त्रुटि हुई",
+      });
+    }
     return res.status(200).json({
       success: true,
-      message: "OTP सफलतापूर्वक सत्यापित!",
-      token,
-      role: account.role // Return role for client-side handling
+      message: "OTP आपके फोन पर भेज दिया गया"
     });
-
   } catch (error) {
-    // Ensure lock is released on errors
-    activeLocks.delete(otp);
-    console.error("OTP verification error:", error);
+    console.error("Forgot password error:", error);
     return res.status(500).json({
       success: false,
-      status: 500,
-      message: error.message
+      message: "आंतरिक सर्वर त्रुटि",
     });
   }
 };
 
-// reset password
-const resetPassword = async (req, res, next) => {
-  const { token, newPassword } = req.body;
-
+const verifyForgotOtp = async (req, res) => {
+  const { phoneNumber, otp, role } = req.body;
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const { email, phoneNumber, role } = decoded; // Accept either email or phone-based flow
+    if (!phoneNumber || !otp || !role) {
+      return res.status(400).json({
+        success: false,
+        message: "फोन नंबर, OTP और भूमिका आवश्यक हैं"
+      });
+    }
+    const user = await User.findOne({ phoneNumber, role });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "उपयोगकर्ता नहीं मिला" });
+    }
+    if (!user.otp || user.otp !== otp) {
+      return res.status(400).json({ success: false, message: "अमान्य OTP" });
+    }
+    // const expiry = user.otpExpiry;
+    // if (!expiry || new Date(expiry).getTime() < Date.now()) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "OTP समाप्त हो गया (5 मिनट)"
+    //   });
+    // }
+    user.otp = undefined;
+    // user.otpExpiry = undefined;
+    await user.save();
+    const resetToken = jwt.sign(
+      { phoneNumber: user.phoneNumber, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
 
-    if ((!email && !phoneNumber) || !role || !['labour', 'contractor'].includes(role)) {
+    return res.status(200).json({
+      success: true,
+      message: "OTP सत्यापित — अब नया पासवर्ड सेट कर सकते हैं",
+      resetToken
+    });
+
+  } catch (err) {
+    console.error("verifyForgotOtp Error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// reset password
+const resetPassword = async (req, res) => {
+  const { token, newPassword } = req.body;
+  try {
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "टोकन और नया पासवर्ड आवश्यक है"
+      });
+    }
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { phoneNumber, role } = decoded;
+
+    if (!phoneNumber || !role) {
       return res.status(400).json({
         success: false,
         message: "अमान्य या समाप्त टोकन"
       });
     }
-
-    // 2. Find account based on role and identifier (email or phone)
-    const Model = role === 'labour' ? User : Contracter;
-    const query = email ? { email: email.toLowerCase() } : { phoneNumber };
-    const account = await Model.findOne(query);
-
-    if (!account) {
+    const user = await User.findOne({ phoneNumber, role });
+    if (!user) {
       return res.status(404).json({
         success: false,
         message: "खाता नहीं मिला"
       });
     }
-
     const hashedPassword = await argon2.hash(newPassword, {
       type: argon2.argon2id,
       memoryCost: 65536,
       timeCost: 3,
-      parallelism: 1,
+      parallelism: 1
     });
 
-    account.password = hashedPassword;
-    await account.save();
+    user.password = hashedPassword;
+    await user.save();
 
     return res.status(200).json({
       success: true,
@@ -512,14 +534,12 @@ const resetPassword = async (req, res, next) => {
   } catch (error) {
     console.error("Password reset error:", error);
 
-    // Handle specific JWT errors
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+    if (error.name === "JsonWebTokenError" || error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
         message: "अमान्य या समाप्त टोकन"
       });
     }
-
     return res.status(500).json({
       success: false,
       message: "आंतरिक सर्वर त्रुटि"
@@ -527,73 +547,6 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-// Forgot password for contractors using phone number
-const forgotPassword = async (req, res, next) => {
-  const { phoneNumber, role } = req.body;
-
-  try {
-    // Validate inputs
-    if (!phoneNumber) {
-      return res.status(400).json({
-        success: false,
-        message: "फोन नंबर आवश्यक है"
-      });
-    }
-
-    if (!role || !['labour', 'contractor'].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: "अमान्य भूमिका निर्दिष्ट। 'मजदूर' या 'ठेकेदार' होना चाहिए"
-      });
-    }
-
-    // Find account by phone number and role
-    const Model = role === 'labour' ? User : Contracter;
-    const account = await Model.findOne({ phoneNumber, role });
-
-    if (!account) {
-      return res.status(404).json({
-        success: false,
-        message: `${role} इस फोन नंबर के साथ नहीं मिला`
-      });
-    }
-
-    // Check OTP cooldown
-    const now = Date.now();
-    if (account.otpExpiration && account.otpExpiration > now) {
-      const remainingTime = Math.ceil((account.otpExpiration - now) / (60 * 1000));
-      return res.status(429).json({
-        success: false,
-        message: `कृपया नया OTP अनुरोध करने से पहले ${remainingTime} मिनट प्रतीक्षा करें`
-      });
-    }
-
-    // Generate dynamic OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    account.otp = otp;
-    account.otpExpiration = now + 15 * 60 * 1000; // 15 minutes expiry
-    await account.save();
-
-    // Format phone number to E.164 format (+91XXXXXXXXXX)
-    const formattedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+91${phoneNumber}`;
-    const message = `आपका OTP है: ${otp} (15 मिनट के लिए वैध)`;
-    // Send OTP via AWS SNS
-    // await sendSMS(formattedPhone, message);
-    const result = await sendOtpSms(formattedPhone, message);
-
-    return res.status(200).json({
-      success: true,
-      message: "आपके फोन नंबर पर OTP सफलतापूर्वक भेजा गया"
-    });
-
-  } catch (error) {
-    console.error("Forgot password error:", error);
-    return res.status(500).json({
-      success: false,
-      message: result.error || "OTP भेजने में त्रुटि हुई",
-    });
-  }
-};
 
 // Save/Update FCM Token for logged-in user
 const updateFcmToken = async (req, res) => {
@@ -626,7 +579,7 @@ const updateFcmToken = async (req, res) => {
 module.exports = {
   roleBasisSignUp,
   sendEmail,
-  verifyOTP,
+  verifyForgotOtp,
   resetPassword,
   login,
   sendOTP,
