@@ -9,7 +9,6 @@ async function connectToDatabase() {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
     });
-    console.log('✅ Connected to MongoDB');
     return true;
   } catch (error) {
     console.error('❌ MongoDB connection error:', error.message);
@@ -18,15 +17,12 @@ async function connectToDatabase() {
 }
 
 async function assignSkillsToUsers() {
-  console.log('🔧 Assigning skills to labour users...');
   
   try {
     // Get all skills
     const skills = await Skill.find({ isActive: true });
-    console.log(`📋 Found ${skills.length} active skills:`, skills.map(s => s.name).join(', '));
     
     if (skills.length === 0) {
-      console.log('❌ No skills found in database');
       return false;
     }
     
@@ -39,10 +35,7 @@ async function assignSkillsToUsers() {
       ]
     });
     
-    console.log(`👷 Found ${labourUsers.length} labour users without skills`);
-    
     if (labourUsers.length === 0) {
-      console.log('✅ All labour users already have skills assigned');
       return true;
     }
     
@@ -58,11 +51,7 @@ async function assignSkillsToUsers() {
       user.skills = selectedSkills;
       await user.save();
       updatedCount++;
-      
-      console.log(`✅ Assigned skills to ${user.firstName || 'User'}: ${selectedSkills.length} skills`);
     }
-    
-    console.log(`🎉 Successfully assigned skills to ${updatedCount} labour users`);
     return true;
     
   } catch (error) {
@@ -72,8 +61,6 @@ async function assignSkillsToUsers() {
 }
 
 async function testSkillAssignment() {
-  console.log('\n🔍 Testing skill assignment...');
-  
   try {
     const labourWithSkills = await User.countDocuments({ 
       role: 'labour', 
@@ -91,43 +78,22 @@ async function testSkillAssignment() {
       skills: { $exists: true, $ne: [] }
     });
     
-    console.log(`📊 Updated Statistics:`);
-    console.log(`  - Labour users with skills: ${labourWithSkills}`);
-    console.log(`  - Labour users with FCM tokens: ${labourWithFCM}`);
-    console.log(`  - Labour users with both: ${labourWithBoth}`);
-    
-    if (labourWithBoth > 0) {
-      console.log('✅ Perfect! Some users have both FCM tokens and skills');
-      console.log('   - Notifications will now work with skill-based filtering');
-    } else {
-      console.log('⚠️  No users have both FCM tokens and skills');
-      console.log('   - Notifications will only work if users have FCM tokens');
-    }
-    
     return true;
   } catch (error) {
-    console.error('❌ Error testing skill assignment:', error.message);
     return false;
   }
 }
 
 async function main() {
-  console.log('🚀 Assigning Skills to Labour Users\n');
-  
   const dbConnected = await connectToDatabase();
   if (!dbConnected) {
-    console.log('❌ Cannot proceed without database connection');
     return;
   }
-  
   const success = await assignSkillsToUsers();
   if (success) {
     await testSkillAssignment();
   }
-  
   await mongoose.disconnect();
-  console.log('\n✅ Disconnected from MongoDB');
-  console.log('🎉 Skill assignment completed!');
 }
 
 main().catch(console.error);
