@@ -38,7 +38,7 @@ const createJobPost = async (req, res) => {
         message: "सभी फ़ील्ड (शीर्षक, विवरण, नौकरी समय, आवश्यक मजदूर, वैध तक) आवश्यक हैं",
       });
     }
-    if (!locationData.coordinates || !locationData.coordinates.length === 2) {
+    if (!locationData.coordinates || locationData.coordinates.length !== 2) {
       return res.status(400).json({
         success: false,
         message: "वैध निर्देशांक आवश्यक हैं",
@@ -59,15 +59,21 @@ const createJobPost = async (req, res) => {
     await jobPost.save();
     
     // ✅ Populate job data for notification
-    const populatedJob = await JobPost.findById(jobPost._id)
-      .populate('contractor', 'firstName lastName')
-      .populate('skills', 'name nameHindi');
     try {
-      await sendJobNotificationToAllLabours(populatedJob);
-      await sendJobNotificationToNearbyLabours(populatedJob, 50000); 
-    } catch (notificationError) {
-      console.error('Notification sending failed:', notificationError);
-      // Don't fail the main request if notification fails
+      const populatedJob = await JobPost.findById(jobPost._id)
+        .populate('contractor', 'firstName lastName')
+        .populate('skills', 'name nameHindi');
+      
+      try {
+        await sendJobNotificationToAllLabours(populatedJob);
+        await sendJobNotificationToNearbyLabours(populatedJob, 50000); 
+      } catch (notificationError) {
+        console.error('Notification sending failed:', notificationError);
+        // Don't fail the main request if notification fails
+      }
+    } catch (populateError) {
+      console.error('Error populating job post:', populateError);
+      // Don't fail the main request if populate fails
     }
 
     return res.status(201).json({
@@ -77,6 +83,7 @@ const createJobPost = async (req, res) => {
     });
   } catch (error) {
     console.error("Error in createJobPost:", error);
+    console.error("Error stack:", error.stack);
     return res.status(500).json({
       success: false,
       message: "आंतरिक सर्वर त्रुटि",
@@ -389,7 +396,7 @@ const getNearbyJobs = async (req, res) => {
       },
       {
         $lookup: {
-          from: "labours",
+          from: "users",
           localField: "contractor",
           foreignField: "_id",
           as: "contractor",

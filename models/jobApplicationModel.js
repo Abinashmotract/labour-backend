@@ -10,7 +10,7 @@ const jobApplicationSchema = new mongoose.Schema(
     },
     labour: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "labour", // userModel se
+      ref: "users", // userModel se
       required: true,
     },
     status: {

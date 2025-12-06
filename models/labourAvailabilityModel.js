@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const labourAvailabilitySchema = new mongoose.Schema({
   labour: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'users',
     required: true
   },
   availabilityDate: {
@@ -51,7 +51,7 @@ const labourAvailabilitySchema = new mongoose.Schema({
     },
     contractor: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'labour'
+      ref: 'users'
     },
     matchedAt: {
       type: Date,

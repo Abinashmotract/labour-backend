@@ -32,7 +32,7 @@ const jobPostSchema = new mongoose.Schema(
     },
     contractor: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "labour",
+      ref: "users",
       required: false,
     },
     createdBy: {
@@ -77,7 +77,7 @@ const jobPostSchema = new mongoose.Schema(
     },
     acceptedLabours: [
       {
-        labour: { type: mongoose.Schema.Types.ObjectId, ref: "labour" },
+        labour: { type: mongoose.Schema.Types.ObjectId, ref: "users" },
         acceptedAt: { type: Date, default: Date.now },
       },
     ],

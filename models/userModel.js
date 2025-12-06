@@ -30,7 +30,7 @@ const UserSchema = new Schema(
     // --- new referral fields ---
     referralCode: { type: String, unique: true, sparse: true }, // only agents will have
     referralsCount: { type: Number, default: 0 }, // how many labours referred to this agent
-    referredBy: { type: Schema.Types.ObjectId, ref: 'labour' }, // who referred this user (if any)
+    referredBy: { type: Schema.Types.ObjectId, ref: 'users' }, // who referred this user (if any)
   },
   { timestamps: true }
 );

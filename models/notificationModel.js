@@ -18,12 +18,12 @@ const NotificationSchema = new mongoose.Schema({
   },
   recipient: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'labour',
+    ref: 'users',
     required: true
   },
   sender: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'labour'
+    ref: 'users'
   },
   job: { 
     type: mongoose.Schema.Types.ObjectId, 
