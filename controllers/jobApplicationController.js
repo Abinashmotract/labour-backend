@@ -3,6 +3,20 @@ const JobPost = require("../models/jobPostModel");
 const User = require("../models/userModel"); 
 const { sendNotification } = require("../utils/notifications");
 
+// Get logo URL
+const getLogoUrl = () => {
+  // Use environment variable or default based on NODE_ENV
+  let baseUrl = process.env.BASE_URL || process.env.API_BASE_URL;
+  if (!baseUrl) {
+    baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://nearbylabour.com' 
+      : 'http://localhost:3512';
+  }
+  // Remove /api if present in baseUrl
+  baseUrl = baseUrl.replace(/\/api$/, '');
+  return `${baseUrl}/images/loginpagelogo.jpeg`;
+};
+
 // Apply for a job (labour side)
 const applyJob = async (req, res) => {
   try {
@@ -58,40 +72,58 @@ const applyJob = async (req, res) => {
       job: jobId,
       labour: labourId,
       coverLetter,
-      status: "accepted",
+      status: "pending",
     });
     await application.save();
-
-    job.labourersFilled += 1;
-    job.acceptedLabours.push({
-      labour: labourId,
-      acceptedAt: new Date(),
-    });
-    if (job.labourersFilled >= job.labourersRequired) job.isFilled = true;
-    await job.save();
     
     // Send notifications
     const labour = await User.findById(labourId);
     const contractor = job.contractor;
 
-    const jobDate = new Date(job.jobTiming);
-    const formattedDate = jobDate.toDateString();
+    // Format date properly
+    let formattedDate = "";
+    if (job.jobTiming) {
+      const jobDate = new Date(job.jobTiming);
+      if (!isNaN(jobDate.getTime())) {
+        // Format date in Hindi format: DD/MM/YYYY
+        const day = String(jobDate.getDate()).padStart(2, '0');
+        const month = String(jobDate.getMonth() + 1).padStart(2, '0');
+        const year = jobDate.getFullYear();
+        formattedDate = `${day}/${month}/${year}`;
+      }
+    }
 
     // Labour notification
     if (labour.fcmToken) {
+      const labourName = `${labour.firstName || ""} ${labour.lastName || ""}`.trim();
+      let message = "";
+      if (labourName) {
+        message = formattedDate 
+          ? `${labourName}, "${job.title}" नौकरी के लिए आपका आवेदन ${formattedDate} को सफलतापूर्वक जमा कर दिया गया है।`
+          : `${labourName}, "${job.title}" नौकरी के लिए आपका आवेदन सफलतापूर्वक जमा कर दिया गया है।`;
+      } else {
+        message = formattedDate 
+          ? `"${job.title}" नौकरी के लिए आपका आवेदन ${formattedDate} को सफलतापूर्वक जमा कर दिया गया है।`
+          : `"${job.title}" नौकरी के लिए आपका आवेदन सफलतापूर्वक जमा कर दिया गया है।`;
+      }
       await sendNotification(
         labour.fcmToken,
-        "Job Applied Successfully",
-        `You are accepted for job "${job.title}" on ${formattedDate}.`
+        "आवेदन जमा किया गया",
+        message,
+        getLogoUrl()
       );
     }
 
     // Contractor notification
     if (contractor.fcmToken) {
+      const message = formattedDate 
+        ? `${labour.firstName} ${labour.lastName} ने आपकी नौकरी "${job.title}" के लिए ${formattedDate} को आवेदन किया है।`
+        : `${labour.firstName} ${labour.lastName} ने आपकी नौकरी "${job.title}" के लिए आवेदन किया है।`;
       await sendNotification(
         contractor.fcmToken,
-        "New Labour Accepted",
-        `${labour.firstName} ${labour.lastName} accepted for your job "${job.title}" on ${formattedDate}.`
+        "नया नौकरी आवेदन",
+        message,
+        getLogoUrl()
       );
     }
 
@@ -102,7 +134,7 @@ const applyJob = async (req, res) => {
     return res.status(201).json({
       success: true,
       status: 201,
-      message: "Job application submitted successfully, emails sent",
+      message: "Job application submitted successfully",
     });
   } catch (err) {
     console.error("Error in applyJob:", err);
@@ -244,38 +276,134 @@ const updateApplicationStatus = async (req, res) => {
         .status(403)
         .json({ success: false, status: 403, message: "Not authorized" });
     }
-    // Prevent changing already finalized applications
-    if (
-      application.status === "accepted" ||
-      application.status === "rejected"
-    ) {
-      return res.status(400).json({
-        success: false,
-        status: 400,
-        message: `Application is already ${application.status}`,
-      });
-    }
+    
     const job = await JobPost.findById(application.job._id);
-    if (status === "accepted") {
+    const previousStatus = application.status;
+    
+    // Handle status change from accepted to rejected or vice versa
+    if (previousStatus === "accepted" && status === "rejected") {
+      // Remove from accepted count
+      if (job.labourersFilled > 0) {
+        job.labourersFilled -= 1;
+      }
+      // Remove from acceptedLabours array
+      job.acceptedLabours = job.acceptedLabours.filter(
+        (labour) => labour.labour.toString() !== application.labour._id.toString()
+      );
+      // Update isFilled status
+      if (job.isFilled && job.labourersFilled < job.labourersRequired) {
+        job.isFilled = false;
+      }
+      await job.save();
+    } else if (previousStatus === "rejected" && status === "accepted") {
+      // Check if job can accept more labours
       if (job.isFilled || job.labourersFilled >= job.labourersRequired) {
         return res.status(400).json({
           success: false,
           message: "Job is already filled",
         });
       }
-    }
-    // Update status
-    application.status = status;
-    await application.save();
-    if (status === "accepted") {
+      // Add to accepted count
+      job.labourersFilled += 1;
+      // Check if this labour is already in acceptedLabours
+      const alreadyAccepted = job.acceptedLabours.some(
+        (labour) => labour.labour.toString() === application.labour._id.toString()
+      );
+      if (!alreadyAccepted) {
+        job.acceptedLabours.push({
+          labour: application.labour._id,
+          acceptedAt: new Date(),
+        });
+      }
+      if (job.labourersFilled >= job.labourersRequired) {
+        job.isFilled = true;
+      }
+      await job.save();
+    } else if (previousStatus === "pending" && status === "accepted") {
+      // Check if job can accept more labours
+      if (job.isFilled || job.labourersFilled >= job.labourersRequired) {
+        return res.status(400).json({
+          success: false,
+          message: "Job is already filled",
+        });
+      }
+      // Add to accepted count
       job.labourersFilled += 1;
       job.acceptedLabours.push({
         labour: application.labour._id,
         acceptedAt: new Date(),
       });
-      if (job.labourersFilled >= job.labourersRequired) job.isFilled = true;
+      if (job.labourersFilled >= job.labourersRequired) {
+        job.isFilled = true;
+      }
       await job.save();
     }
+    
+    // Update status
+    application.status = status;
+    await application.save();
+    
+    // Send notifications to labour
+    const labour = await User.findById(application.labour._id);
+    
+    // Get labour name
+    const labourName = labour 
+      ? `${labour.firstName || ""} ${labour.lastName || ""}`.trim() 
+      : "";
+    
+    // Format date properly
+    let formattedDate = "";
+    if (job.jobTiming) {
+      const jobDate = new Date(job.jobTiming);
+      if (!isNaN(jobDate.getTime())) {
+        // Format date in Hindi format: DD/MM/YYYY
+        const day = String(jobDate.getDate()).padStart(2, '0');
+        const month = String(jobDate.getMonth() + 1).padStart(2, '0');
+        const year = jobDate.getFullYear();
+        formattedDate = `${day}/${month}/${year}`;
+      }
+    }
+    
+    if (status === "accepted") {
+      if (labour && labour.fcmToken) {
+        let message = "";
+        if (labourName) {
+          message = formattedDate 
+            ? `${labourName}, "${job.title}" नौकरी के लिए आपका आवेदन ${formattedDate} को स्वीकार कर लिया गया है। 🎉`
+            : `${labourName}, "${job.title}" नौकरी के लिए आपका आवेदन स्वीकार कर लिया गया है। 🎉`;
+        } else {
+          message = formattedDate 
+            ? `"${job.title}" नौकरी के लिए आपका आवेदन ${formattedDate} को स्वीकार कर लिया गया है। 🎉`
+            : `"${job.title}" नौकरी के लिए आपका आवेदन स्वीकार कर लिया गया है। 🎉`;
+        }
+        await sendNotification(
+          labour.fcmToken,
+          "आवेदन स्वीकार किया गया! 🎉",
+          message,
+          getLogoUrl()
+        );
+      }
+    } else if (status === "rejected") {
+      if (labour && labour.fcmToken) {
+        let message = "";
+        if (labourName) {
+          message = formattedDate 
+            ? `${labourName}, "${job.title}" नौकरी के लिए आपका आवेदन ${formattedDate} को अस्वीकार कर दिया गया है।`
+            : `${labourName}, "${job.title}" नौकरी के लिए आपका आवेदन अस्वीकार कर दिया गया है।`;
+        } else {
+          message = formattedDate 
+            ? `"${job.title}" नौकरी के लिए आपका आवेदन ${formattedDate} को अस्वीकार कर दिया गया है।`
+            : `"${job.title}" नौकरी के लिए आपका आवेदन अस्वीकार कर दिया गया है।`;
+        }
+        await sendNotification(
+          labour.fcmToken,
+          "आवेदन स्थिति अपडेट",
+          message,
+          getLogoUrl()
+        );
+      }
+    }
+    
     const updatedApplication = await JobApplication.findById(applicationId)
       .populate("job", "title labourersRequired labourersFilled isFilled")
       .populate("labour", "firstName lastName");

@@ -71,6 +71,7 @@ app.use(bodyParser.json());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/images', express.static(path.join(__dirname)));
 
 // Admin API routes
 app.use("/api/admin", adminAuthRoute);
