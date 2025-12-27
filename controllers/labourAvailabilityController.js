@@ -703,6 +703,137 @@ const getAvailableLabours = async (req, res) => {
   }
 };
 
+// Search available labourers for contractors
+const searchAvailableLabours = async (req, res) => {
+  try {
+    const contractorId = req.user.id;
+    const {
+      search,
+      latitude,
+      longitude,
+      maxDistance = 15000,
+      skillId,
+      work_category,
+      availabilityDate
+    } = req.query;
+
+    // Validate lat/lon
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        success: false,
+        message: "Latitude and longitude are required.",
+      });
+    }
+
+    // Fetch contractor (for category match fallback)
+    const contractor = await User.findById(contractorId).select("work_category");
+    if (!contractor) {
+      return res.status(404).json({
+        success: false,
+        message: "Contractor not found.",
+      });
+    }
+
+    // Prepare date range
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const selectedDate = availabilityDate ? new Date(availabilityDate) : today;
+
+    // Base query
+    let query = {
+      status: "active",
+      isAvailable: true,
+      availabilityDate: { $gte: selectedDate },
+      location: {
+        $near: {
+          $geometry: {
+            type: "Point",
+            coordinates: [parseFloat(longitude), parseFloat(latitude)],
+          },
+          $maxDistance: parseInt(maxDistance), // meters
+        },
+      },
+    };
+
+    // Optional filters
+    if (skillId) query.skills = { $in: [skillId] };
+    if (work_category) query.work_category = work_category;
+
+    // Fetch nearby available labours
+    const labourAvailabilityList = await LabourAvailability.find(query)
+      .sort({ availabilityDate: 1, createdAt: -1 });
+
+    // Populate user + skill info
+    let populatedLabours = await Promise.all(
+      labourAvailabilityList.map(async (availability) => {
+        const labourData = await User.findById(availability.labour).select(
+          "firstName lastName phoneNumber profilePicture work_category skills location email"
+        );
+
+        if (!labourData) return null;
+
+        const skillsIds = availability.skills?.length > 0
+          ? availability.skills
+          : labourData.skills || [];
+
+        const skillsData = skillsIds.length
+          ? await Skill.find({ _id: { $in: skillsIds } }).select("name nameHindi")
+          : [];
+
+        return {
+          ...availability.toObject(),
+          labour: labourData,
+          skills: skillsData,
+        };
+      })
+    );
+
+    // Remove nulls (if any labour deleted)
+    populatedLabours = populatedLabours.filter(Boolean);
+
+    // If work_category not passed, filter by contractor category
+    if (!work_category) {
+      populatedLabours = populatedLabours.filter(
+        (item) =>
+          item.labour?.work_category &&
+          item.labour.work_category === contractor.work_category
+      );
+    }
+
+    // Apply search filter if provided
+    if (search && search.trim()) {
+      const searchTerm = search.trim().toLowerCase();
+      populatedLabours = populatedLabours.filter((item) => {
+        const labour = item.labour;
+        if (!labour) return false;
+        
+        const fullName = `${labour.firstName || ''} ${labour.lastName || ''}`.trim().toLowerCase();
+        const phone = (labour.phoneNumber || '').toLowerCase();
+        const email = (labour.email || '').toLowerCase();
+        
+        return fullName.includes(searchTerm) || 
+               phone.includes(searchTerm) || 
+               email.includes(searchTerm);
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: search ? "खोज परिणाम सफलतापूर्वक प्राप्त" : "उपलब्ध मजदूर सफलतापूर्वक प्राप्त",
+      count: populatedLabours.length,
+      data: populatedLabours,
+      searchQuery: search || null,
+    });
+  } catch (error) {
+    console.error("❌ Error in searchAvailableLabours:", error);
+    return res.status(500).json({
+      success: false,
+      message: "आंतरिक सर्वर त्रुटि",
+    });
+  }
+};
+
 // Get all labour availability requests (Admin only)
 const getAllLabourAvailabilityRequests = async (req, res) => {
   try {
@@ -754,6 +885,7 @@ module.exports = {
   getMyAvailabilityRequests,
   cancelAvailabilityRequest,
   getAvailableLabours,
+  searchAvailableLabours,
   getAvailableLaboursByDate,
   getAvailabilityStatus,
   toggleAvailability,

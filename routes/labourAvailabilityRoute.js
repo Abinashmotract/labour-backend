@@ -6,6 +6,7 @@ const {
   getMyAvailabilityRequests,
   cancelAvailabilityRequest,
   getAvailableLabours,
+  searchAvailableLabours,
   getAvailableLaboursByDate,
   getAvailabilityStatus,
   toggleAvailability,
@@ -21,6 +22,7 @@ router.post('/toggle', verifyAllToken(['labour']), toggleAvailability);
 
 // Contractor routes
 router.get('/available-labours', verifyAllToken(['contractor']), getAvailableLabours);
+router.get('/search-available-labours', verifyAllToken(['contractor']), searchAvailableLabours);
 router.get('/available-labours-by-date', verifyAllToken(['contractor']), getAvailableLaboursByDate);
 
 // Admin routes

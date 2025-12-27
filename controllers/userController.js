@@ -637,6 +637,142 @@ const getAllLabours = async (req, res) => {
   }
 };
 
+// Search all labours (for contractor side)
+const searchAllLabours = async (req, res) => {
+  try {
+    const contractorId = req.user.id;
+    const { search, availabilityDate } = req.query;
+    
+    const contractor = await User.findById(contractorId);
+    if (!contractor || contractor.role !== "contractor") {
+      return res.status(403).json({
+        success: false,
+        status: 403,
+        message: "केवल ठेकेदार ही इस डेटा तक पहुंच सकते हैं",
+      });
+    }
+    const contractorCategory = contractor.work_category;
+
+    if (!contractorCategory) {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "ठेकेदार का कोई कार्य श्रेणी परिभाषित नहीं है",
+      });
+    }
+
+    // Base query for labours
+    let labourQuery = {
+      role: "labour",
+      work_category: contractorCategory,
+    };
+
+    // Add search filter if provided
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i');
+      labourQuery.$or = [
+        { firstName: searchRegex },
+        { lastName: searchRegex },
+        { phoneNumber: searchRegex },
+        { email: searchRegex },
+      ];
+    }
+
+    let labours = await User.find(labourQuery).select(
+      "-password -refreshToken -otp -otpAttempts -otpFailedAttempts -lastOtpRequest"
+    );
+
+    // If availability date is provided, filter labours who are available on that date
+    if (availabilityDate) {
+      try {
+        const requestedDate = new Date(availabilityDate);
+        if (isNaN(requestedDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            status: 400,
+            message: "अमान्य तिथि प्रारूप",
+          });
+        }
+
+        requestedDate.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(requestedDate);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const LabourAvailability = require('../models/labourAvailabilityModel');
+        const availableLabours = await LabourAvailability.find({
+          availabilityDate: {
+            $gte: requestedDate,
+            $lte: endOfDay
+          },
+          status: 'active'
+        }).select('labour');
+
+        const availableLabourIds = availableLabours.map(avail => avail.labour);
+        labours = labours.filter(labour => availableLabourIds.includes(labour._id.toString()));
+
+        labours = await Promise.all(labours.map(async (labour) => {
+          const availability = await LabourAvailability.findOne({
+            labour: labour._id,
+            availabilityDate: {
+              $gte: requestedDate,
+              $lte: endOfDay
+            },
+            status: 'active'
+          }).populate('skills', 'name nameHindi category');
+
+          return {
+            ...labour.toObject(),
+            availability: availability ? {
+              availabilityDate: availability.availabilityDate,
+              skills: availability.skills,
+              location: availability.location,
+              status: availability.status
+            } : null
+          };
+        }));
+
+      } catch (dateError) {
+        console.error("Date filtering error:", dateError);
+        return res.status(400).json({
+          success: false,
+          status: 400,
+          message: "तिथि फ़िल्टरिंग में त्रुटि",
+        });
+      }
+    }
+
+    if (!labours || labours.length === 0) {
+      return res.status(200).json({
+        success: true,
+        status: 200,
+        message: search ? "खोज के अनुसार कोई मजदूर नहीं मिला!" : (availabilityDate ? "इस तिथि पर कोई उपलब्ध मजदूर नहीं मिला!" : "कोई मिलान करने वाला मजदूर नहीं मिला!"),
+        total: 0,
+        data: [],
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: search ? "खोज परिणाम सफलतापूर्वक प्राप्त!" : (availabilityDate ? "उपलब्ध मजदूर सफलतापूर्वक प्राप्त किए गए!" : "मिलान करने वाले मजदूर सफलतापूर्वक प्राप्त किए गए!"),
+      total: labours.length,
+      data: labours,
+      searchQuery: search || null,
+      filterApplied: availabilityDate ? {
+        availabilityDate: availabilityDate,
+        description: `मजदूर जो ${new Date(availabilityDate).toLocaleDateString('hi-IN')} को उपलब्ध हैं`
+      } : null
+    });
+  } catch (error) {
+    console.error("Search labours error:", error);
+    return res.status(500).json({
+      success: false,
+      status: 500,
+      message: "आंतरिक सर्वर त्रुटि",
+    });
+  }
+};
+
 const deleteLabourAccount = async (req, res) => {
   try {
     const labourId = req.user.id;
@@ -666,6 +802,7 @@ module.exports = {
   toggleContractorAgent,
   getLabourDetailsById,
   getAllLabours,
+  searchAllLabours,
   updateRoleBasisUser,
   getLoggedInUser,
   deleteUser,

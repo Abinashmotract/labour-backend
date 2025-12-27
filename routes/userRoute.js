@@ -5,6 +5,7 @@ const {
     toggleContractorAgent,
     getLabourDetailsById,
     getAllLabours,
+    searchAllLabours,
     getLoggedInUser,
     deleteUser,
     updateLocation,
@@ -33,6 +34,7 @@ router.put('/role/update-user-details', verifyAllToken(['labour', 'contractor'])
 router.get('/admin/get-all', verifyAllToken(['admin', 'labour']), getAllUsers);
 router.put("/admin/contractor/:id/toggle-agent", verifyAllToken(["admin"]), toggleContractorAgent);
 router.get('/contractor/all-labour', verifyAllToken(['contractor']), getAllLabours);
+router.get('/contractor/search-labour', verifyAllToken(['contractor']), searchAllLabours);
 router.delete('/admin/delete/:id', verifyAllToken(['admin']), deleteUser);
 router.get('/admin/search-users', verifyAllToken(['admin']), searchUsers);
 router.delete('/admin/multiple/delete', deleteMultipleUsers);
