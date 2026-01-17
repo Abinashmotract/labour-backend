@@ -15,6 +15,7 @@ const {
     updateRoleBasisUser,
     getLaboursByAgent,
     deleteLabourAccount,
+    adminUpdateUser,
 } = require('../controllers/userController');
 const { verifyUser, verifyAdmin, verifyAllToken } = require("../middleware/verifyToken");
 
@@ -31,6 +32,7 @@ router.get('/labour-details', verifyAllToken(['labour']), getLabourDetailsById);
 
 // admin routes
 router.put('/role/update-user-details', verifyAllToken(['labour', 'contractor']), uploadToLocal, updateRoleBasisUser);
+router.put('/admin/update-user', verifyAllToken(['admin']), uploadToLocal, adminUpdateUser);
 router.get('/admin/get-all', verifyAllToken(['admin', 'labour']), getAllUsers);
 router.put("/admin/contractor/:id/toggle-agent", verifyAllToken(["admin"]), toggleContractorAgent);
 router.get('/contractor/all-labour', verifyAllToken(['contractor']), getAllLabours);

@@ -18,7 +18,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const allowedTypes = ["image/png", "image/jpg", "image/jpeg"];
+const allowedTypes = ["image/png", "image/jpg", "image/jpeg", "image/webp"];
 
 const upload = multer({
   storage,
@@ -27,7 +27,7 @@ const upload = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only PNG, JPG, and JPEG formats are allowed"), false);
+      cb(new Error("Only PNG, JPG, JPEG, and WEBP formats are allowed"), false);
     }
   },
 });

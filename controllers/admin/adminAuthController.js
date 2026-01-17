@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const createError = require('../../middleware/error');
 const User = require('../../models/userModel');
 const Contracter = require('../../models/Contracter');
+const JobApplication = require('../../models/jobApplicationModel');
+const JobPost = require('../../models/jobPostModel');
 
 // Login function
 const loginAdmin = async (req, res, next) => {
@@ -117,6 +119,70 @@ const dashboardOverViews = async (req, res) => {
         });
         recentActivity.sort((a, b) => new Date(b.timeRaw) - new Date(a.timeRaw));
         const cleanedRecentActivity = recentActivity.map(({ timeRaw, ...rest }) => rest);
+
+        // Get contractor acceptances for labour requests
+        const contractorAcceptances = await JobApplication.find({ status: 'accepted' })
+            .populate({
+                path: 'job',
+                populate: {
+                    path: 'contractor',
+                    select: 'firstName lastName email phoneNumber'
+                }
+            })
+            .populate('labour', 'firstName lastName email phoneNumber')
+            .sort({ updatedAt: -1 })
+            .limit(10)
+            .lean();
+
+        const contractorAcceptanceData = contractorAcceptances.map(app => ({
+            labourName: `${app.labour?.firstName || ''} ${app.labour?.lastName || ''}`.trim() || 'Unknown',
+            labourEmail: app.labour?.email || 'N/A',
+            labourPhone: app.labour?.phoneNumber || 'N/A',
+            contractorName: `${app.job?.contractor?.firstName || ''} ${app.job?.contractor?.lastName || ''}`.trim() || 'Unknown',
+            contractorEmail: app.job?.contractor?.email || 'N/A',
+            contractorPhone: app.job?.contractor?.phoneNumber || 'N/A',
+            jobTitle: app.job?.title || 'N/A',
+            acceptedAt: app.updatedAt,
+            acceptedAtFormatted: timeAgo(app.updatedAt),
+        }));
+
+        // Get accepted labours for contractor job posts
+        const contractorJobPosts = await JobPost.find({ contractor: { $exists: true, $ne: null } })
+            .populate('contractor', 'firstName lastName email phoneNumber')
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean();
+
+        const contractorJobData = [];
+        for (const job of contractorJobPosts) {
+            const acceptedApplications = await JobApplication.find({
+                job: job._id,
+                status: 'accepted'
+            })
+                .populate('labour', 'firstName lastName email phoneNumber')
+                .lean();
+
+            if (acceptedApplications.length > 0) {
+                contractorJobData.push({
+                    jobTitle: job.title || 'N/A',
+                    contractorName: `${job.contractor?.firstName || ''} ${job.contractor?.lastName || ''}`.trim() || 'Unknown',
+                    contractorEmail: job.contractor?.email || 'N/A',
+                    contractorPhone: job.contractor?.phoneNumber || 'N/A',
+                    labourersRequired: job.labourersRequired || 0,
+                    labourersFilled: job.labourersFilled || 0,
+                    acceptedLaboursCount: acceptedApplications.length,
+                    acceptedLabours: acceptedApplications.map(app => ({
+                        labourName: `${app.labour?.firstName || ''} ${app.labour?.lastName || ''}`.trim() || 'Unknown',
+                        labourEmail: app.labour?.email || 'N/A',
+                        labourPhone: app.labour?.phoneNumber || 'N/A',
+                        acceptedAt: app.updatedAt,
+                        acceptedAtFormatted: timeAgo(app.updatedAt),
+                    })),
+                    createdAt: job.createdAt,
+                });
+            }
+        }
+
         return res.status(200).json({
             status: 200,
             success: true,
@@ -126,6 +192,8 @@ const dashboardOverViews = async (req, res) => {
                 pendingContractorApprovals,
                 approvedContractors,
                 recentActivity: cleanedRecentActivity,
+                contractorAcceptances: contractorAcceptanceData,
+                contractorJobAcceptances: contractorJobData,
             },
         });
 
@@ -143,19 +211,48 @@ const dashboardOverViews = async (req, res) => {
 const adminCreateUser = async (req, res, next) => {
     try {
         const { firstName, lastName, email, phoneNumber, role } = req.body;
-        if (!firstName || !lastName || !email || !phoneNumber || !role) {
-            return next(createError(400, "All fields are required"));
+        
+        // Validate required fields (email is optional)
+        if (!firstName || !firstName.trim()) {
+            return next(createError(400, "First name is required"));
         }
+        if (!lastName || !lastName.trim()) {
+            return next(createError(400, "Last name is required"));
+        }
+        if (!phoneNumber || !phoneNumber.trim()) {
+            return next(createError(400, "Phone number is required"));
+        }
+        if (!role) {
+            return next(createError(400, "Role is required"));
+        }
+        
         if (!["labour", "contractor"].includes(role)) {
-            return next(createError(400, "Invalid role"));
+            return next(createError(400, "Invalid role. Must be 'labour' or 'contractor'"));
         }
+        
+        // Validate phone number format (basic validation)
+        const phoneRegex = /^[0-9]{10}$/;
+        if (!phoneRegex.test(phoneNumber.trim())) {
+            return next(createError(400, "Phone number must be 10 digits"));
+        }
+        
+        // Validate email format if provided (email is optional)
+        if (email && email.trim()) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email.trim())) {
+                return next(createError(400, "Invalid email format"));
+            }
+        }
+        
         let user = await User.findOne({ phoneNumber });
         const otp = "888888";
         const otpExpiry = new Date(Date.now() + 5 * 60 * 1000);
         if (user) {
-            user.firstName = firstName;
-            user.lastName = lastName;
-            user.email = email.toLowerCase();
+            user.firstName = firstName.trim();
+            user.lastName = lastName.trim();
+            if (email && email.trim()) {
+                user.email = email.toLowerCase().trim();
+            }
             user.role = role;
             user.otp = otp;
             user.otpExpiry = otpExpiry;
@@ -164,10 +261,10 @@ const adminCreateUser = async (req, res, next) => {
             }
         } else {
             user = new User({
-                firstName,
-                lastName,
-                email: email.toLowerCase(),
-                phoneNumber,
+                firstName: firstName.trim(),
+                lastName: lastName.trim(),
+                email: email && email.trim() ? email.toLowerCase().trim() : undefined,
+                phoneNumber: phoneNumber.trim(),
                 role,
                 otp,
                 otpExpiry,

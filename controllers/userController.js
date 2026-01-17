@@ -276,6 +276,79 @@ const updateRoleBasisUser = async (req, res) => {
   }
 };
 
+const adminUpdateUser = async (req, res) => {
+  try {
+    const {
+      userId,
+      firstName,
+      lastName,
+      email,
+      addressLine1,
+      work_category,
+      work_experience,
+      gender,
+      isAgent,
+      lat,
+      lng
+    } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, status: 400, message: "User ID is required" });
+    }
+
+    let user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, status: 404, message: "User not found" });
+
+    if (!["labour", "contractor"].includes(user.role)) {
+      return res.status(403).json({ success: false, status: 403, message: "Only labour/contractor users can be updated" });
+    }
+
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (email) user.email = email.toLowerCase();
+    if (work_category) user.work_category = work_category;
+    if (work_experience) user.work_experience = work_experience;
+    if (gender) user.gender = gender;
+
+    // Update agent status only if contractor
+    if (user.role === "contractor") {
+      if (typeof isAgent !== "undefined") {
+        user.isAgent = isAgent;
+      }
+    }
+
+    // Update location (lat/lng preferred)
+    if (lat && lng) {
+      user.location = { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] };
+      try {
+        const address = await getAddressFromCoordinates(lat, lng);
+        user.addressLine1 = address;
+      } catch (err) {
+        console.warn("Reverse geocoding failed:", err.message);
+      }
+    } else if (addressLine1) {
+      // fallback if only address is given
+      user.addressLine1 = addressLine1;
+    }
+
+    if (req.fileLocations?.profilePicture) {
+      user.profilePicture = req.fileLocations.profilePicture;
+    }
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "User updated successfully",
+      data: user,
+    });
+  } catch (error) {
+    console.error("Admin update user error:", error);
+    return res.status(500).json({ success: false, status: 500, message: error.message });
+  }
+};
+
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
@@ -811,5 +884,6 @@ module.exports = {
   deleteMultipleUsers,
   uploadProfileImage,
   getLaboursByAgent,
-  deleteLabourAccount
+  deleteLabourAccount,
+  adminUpdateUser
 };
