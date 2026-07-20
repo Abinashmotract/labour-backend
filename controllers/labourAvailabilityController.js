@@ -321,6 +321,38 @@ const cancelAvailabilityRequest = async (req, res) => {
   }
 };
 
+// Hard delete availability request
+const deleteAvailabilityRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const labourId = req.user.id;
+
+    const request = await LabourAvailability.findOneAndDelete({
+      _id: requestId,
+      labour: labourId
+    });
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'उपलब्धता अनुरोध नहीं मिला'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'उपलब्धता अनुरोध सफलतापूर्वक हटा दिया गया'
+    });
+
+  } catch (error) {
+    console.error('Error in deleteAvailabilityRequest:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'आंतरिक सर्वर त्रुटि'
+    });
+  }
+};
+
 // Get availability status for specific date
 const getAvailabilityStatus = async (req, res) => {
   try {
@@ -889,5 +921,6 @@ module.exports = {
   getAvailableLaboursByDate,
   getAvailabilityStatus,
   toggleAvailability,
-  getAllLabourAvailabilityRequests
+  getAllLabourAvailabilityRequests,
+  deleteAvailabilityRequest
 };

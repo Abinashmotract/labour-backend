@@ -148,6 +148,9 @@ const roleBasisSignUp = async (req, res) => {
     if (!phoneNumber || !role) {
       return res.status(400).json({ success: false, message: "फोन नंबर और भूमिका आवश्यक हैं" });
     }
+    if (!firstName || !lastName || !password || !work_category || !work_experience || !gender) {
+      return res.status(400).json({ success: false, message: "सभी फ़ील्ड (नाम, उपनाम, पासवर्ड, कार्य श्रेणी, अनुभव, लिंग) आवश्यक हैं" });
+    }
     // 🔥 Check if verified OTP exists
     const otpVerifiedUser = await User.findOne({ phoneNumber, isPhoneVerified: true });
     if (!otpVerifiedUser) {
@@ -167,7 +170,9 @@ const roleBasisSignUp = async (req, res) => {
     const hashedPassword = await argon2.hash(password);
     user.firstName = firstName;
     user.lastName = lastName;
-    user.email = email.toLowerCase();
+    if (email) {
+      user.email = email.toLowerCase();
+    }
     user.password = hashedPassword;
     user.addressLine1 = addressLine1;
     user.work_category = work_category;

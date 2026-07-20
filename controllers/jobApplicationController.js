@@ -72,7 +72,7 @@ const applyJob = async (req, res) => {
       job: jobId,
       labour: labourId,
       coverLetter,
-      status: "pending",
+      status: "applied",
     });
     await application.save();
     
@@ -155,7 +155,7 @@ const myApplications = async (req, res) => {
           "title description location jobTiming labourersRequired labourersFilled isFilled skills contractor",
         populate: [
           { path: "skills", select: "name" },
-          { path: "contractor", select: "firstName lastName email phoneNumber" }
+          { path: "contractor", select: "firstName lastName email phoneNumber profilePicture" }
         ],
       })
       .sort({ createdAt: -1 });
@@ -191,7 +191,8 @@ const myApplications = async (req, res) => {
                 firstName: app.job.contractor.firstName,
                 lastName: app.job.contractor.lastName,
                 email: app.job.contractor.email,
-                phoneNumber: app.job.contractor.phoneNumber
+                phoneNumber: app.job.contractor.phoneNumber,
+                profilePicture: app.job.contractor.profilePicture || ""
               }
             : null
         }
@@ -319,7 +320,7 @@ const updateApplicationStatus = async (req, res) => {
         job.isFilled = true;
       }
       await job.save();
-    } else if (previousStatus === "pending" && status === "accepted") {
+    } else if (previousStatus === "applied" && status === "accepted") {
       // Check if job can accept more labours
       if (job.isFilled || job.labourersFilled >= job.labourersRequired) {
         return res.status(400).json({

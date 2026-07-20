@@ -10,13 +10,15 @@ const {
   getAvailableLaboursByDate,
   getAvailabilityStatus,
   toggleAvailability,
-  getAllLabourAvailabilityRequests
+  getAllLabourAvailabilityRequests,
+  deleteAvailabilityRequest
 } = require('../controllers/labourAvailabilityController');
 
 // Labour routes
 router.post('/submit', verifyAllToken(['labour']), submitAvailabilityRequest);
 router.get('/my-requests', verifyAllToken(['labour']), getMyAvailabilityRequests);
 router.put('/cancel/:requestId', verifyAllToken(['labour']), cancelAvailabilityRequest);
+router.delete('/delete/:requestId', verifyAllToken(['labour']), deleteAvailabilityRequest);
 router.get('/status', verifyAllToken(['labour']), getAvailabilityStatus);
 router.post('/toggle', verifyAllToken(['labour']), toggleAvailability);
 

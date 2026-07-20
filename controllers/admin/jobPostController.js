@@ -3,6 +3,7 @@ const Skill = require("../../models/skillModel");
 const User = require("../../models/userModel");
 const { sendJobNotificationToAllLabours, sendJobNotificationToNearbyLabours } = require("../../service/notificationService");
 const { sendAndSaveNotification } = require("../notificationController");
+const mongoose = require("mongoose");
 
 // Create Job Post (Admin)
 const createJobPost = async (req, res) => {
@@ -124,6 +125,7 @@ const getAllJobPosts = async (req, res) => {
         "firstName lastName email phoneNumber profilePicture"
       )
       .populate("skills", "name nameHindi category")
+      .populate("acceptedLabours.labour", "firstName lastName phoneNumber profilePicture")
       .sort({ createdAt: -1 });
     return res.status(200).json({
       success: true,
@@ -175,6 +177,7 @@ const getContractorJobs = async (req, res) => {
         "firstName lastName email phoneNumber profilePicture"
       )
       .populate("skills", "name")
+      .populate("acceptedLabours.labour", "firstName lastName phoneNumber profilePicture")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -403,6 +406,16 @@ const getNearbyJobs = async (req, res) => {
         },
       },
       {
+        $lookup: {
+          from: "jobapplications",
+          let: { jobId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$job", "$$jobId"] } } }
+          ],
+          as: "applications",
+        },
+      },
+      {
         $unwind: {
           path: "$contractor",
           preserveNullAndEmptyArrays: true,
@@ -428,8 +441,9 @@ const getNearbyJobs = async (req, res) => {
           },
           distance: 1,
           createdAt: 1,
+          jobAppliedCount: { $size: "$applications" },
           hasApplied: {
-            $in: [labourId, "$acceptedLabours.labour"],
+            $in: [new mongoose.Types.ObjectId(labourId), "$applications.labour"],
           },
         },
       },

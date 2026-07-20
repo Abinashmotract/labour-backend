@@ -27,3 +27,6 @@ dist/
 *.njsproj
 *.sln
 *.csproj
+.env
+.env.*
+!.env.example
