@@ -7,6 +7,7 @@ const UserSchema = new Schema(
     lastName: { type: String },
     email: { type: String, lowercase: true, trim: true },
     phoneNumber: { type: String, required: true },
+    firebaseUid: { type: String, sparse: true, unique: true },
     otp: { type: String }, // 6 digit OTP
     otpExpiry: { type: Date }, // OTP expiry time
     isPhoneVerified: { type: Boolean, default: false },

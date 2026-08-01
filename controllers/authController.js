@@ -4,9 +4,11 @@ const nodemailer = require("nodemailer");
 const activeLocks = new Map(); // In-memory store for locks
 const jwt = require("jsonwebtoken");
 const argon2 = require("argon2");
+const bcrypt = require("bcrypt");
 const Contracter = require("../models/Contracter");
 const { getAddressFromCoordinates } = require("../utils/geocoding");
 const { sendOtpSms } = require("../utils/twilio");
+const firebaseAdmin = require("../utils/firebase");
 
 // Function to send OTP
 const sendOTP = async (req, res) => {
@@ -115,6 +117,85 @@ const verifyOtp = async (req, res) => {
   } catch (err) {
     console.error("Verify OTP Error:", err);
     return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Sign in with a Firebase Phone Authentication ID token.
+const firebaseLogin = async (req, res) => {
+  try {
+    const { idToken, role } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Firebase ID token आवश्यक है",
+      });
+    }
+
+    const decodedToken = await firebaseAdmin.auth().verifyIdToken(idToken);
+    const { uid, phone_number: phoneNumber } = decodedToken;
+
+    if (!uid || !phoneNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Firebase token में फोन नंबर उपलब्ध नहीं है",
+      });
+    }
+
+    let user = await User.findOne({ firebaseUid: uid });
+    if (!user) {
+      user = await User.findOne({ phoneNumber });
+    }
+
+    if (!user) {
+      const userRole = ["labour", "contractor"].includes(role) ? role : "labour";
+      user = new User({ phoneNumber, role: userRole, firebaseUid: uid });
+    } else {
+      user.firebaseUid = uid;
+      user.phoneNumber = phoneNumber;
+    }
+
+    user.isPhoneVerified = true;
+    await user.save();
+
+    const token = jwt.sign(
+      { id: user._id, phoneNumber: user.phoneNumber, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "24h" }
+    );
+    const refreshToken = jwt.sign(
+      { id: user._id },
+      process.env.REFRESH_SECRET,
+      { expiresIn: "30d" }
+    );
+
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      status: 200,
+      message: "लॉगिन सफल!",
+      id: user._id,
+      token,
+      refreshToken,
+      role: user.role,
+      phoneNumber: user.phoneNumber,
+    });
+  } catch (error) {
+    console.error("Firebase login error:", error);
+
+    if (error.code === "auth/id-token-expired" || error.code === "auth/argument-error") {
+      return res.status(401).json({
+        success: false,
+        message: "अमान्य या समाप्त Firebase ID token",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Firebase लॉगिन में त्रुटि हुई",
+    });
   }
 };
 
@@ -266,7 +347,35 @@ const login = async (req, res, next) => {
         message: "ठेकेदार अनुमोदित नहीं!"
       });
     }
-    const isPasswordValid = await argon2.verify(account.password, password);
+    // Accounts created through OTP/admin flows may not have a password yet.
+    // Do not pass an empty value to argon2: it throws instead of returning false.
+    if (typeof account.password !== "string" || account.password.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "खाता सेटअप अधूरा है। कृपया पहले साइनअप पूरा करें या पासवर्ड रीसेट करें।",
+      });
+    }
+
+    let isPasswordValid = false;
+    const storedPassword = account.password.trim();
+
+    if (storedPassword.startsWith("$argon2")) {
+      isPasswordValid = await argon2.verify(storedPassword, password);
+    } else if (/^\$2[aby]\$/.test(storedPassword)) {
+      // Support old bcrypt records and upgrade them after successful login.
+      isPasswordValid = await bcrypt.compare(password, storedPassword);
+      if (isPasswordValid) {
+        account.password = await argon2.hash(password);
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        status: 400,
+        message: "पासवर्ड रिकॉर्ड अमान्य है। कृपया पासवर्ड रीसेट करें।",
+      });
+    }
+
     if (!isPasswordValid) {
       return res.status(400).json({
         success: false,
@@ -587,6 +696,7 @@ module.exports = {
   verifyForgotOtp,
   resetPassword,
   login,
+  firebaseLogin,
   sendOTP,
   verifyOtp,
   updateFcmToken,

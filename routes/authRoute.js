@@ -5,6 +5,7 @@ const {
     verifyForgotOtp,
     resetPassword,
     login,
+    firebaseLogin,
     sendOTP,
     verifyOtp,
     updateFcmToken,
@@ -53,6 +54,7 @@ router.post('/reset-password', resetPassword);
 router.post('/forgot-password', otpRateLimiter, forgotPassword);
 router.post('/login', login);
 router.post('/user/login', login);
+router.post('/firebase-login', firebaseLogin);
 
 
 
