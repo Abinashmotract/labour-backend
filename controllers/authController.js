@@ -10,6 +10,24 @@ const { getAddressFromCoordinates } = require("../utils/geocoding");
 const { sendOtpSms } = require("../utils/twilio");
 const firebaseAdmin = require("../utils/firebase");
 
+// Firebase returns Indian phone numbers in E.164 format (+91XXXXXXXXXX),
+// while the signup client may send the local 10-digit format.
+const getPhoneNumberVariants = (phoneNumber) => {
+  const value = String(phoneNumber).trim();
+  const digits = value.replace(/\D/g, "");
+  const variants = new Set([value]);
+
+  if (digits.length === 10) {
+    variants.add(digits);
+    variants.add(`+91${digits}`);
+  } else if (digits.length === 12 && digits.startsWith("91")) {
+    variants.add(digits.slice(2));
+    variants.add(`+${digits}`);
+  }
+
+  return [...variants];
+};
+
 // Function to send OTP
 const sendOTP = async (req, res) => {
   try {
@@ -191,7 +209,7 @@ const roleBasisSignUp = async (req, res) => {
       firstName,
       lastName,
       email,
-      phoneNumber,
+      phoneNumber: requestedPhoneNumber,
       password,
       addressLine1,
       work_category,
@@ -210,17 +228,26 @@ const roleBasisSignUp = async (req, res) => {
     // if (user.email) {
     //   return res.status(400).json({ success: false, message: "उपयोगकर्ता पहले से पंजीकृत है" });
     // }
-    if (!phoneNumber || !role) {
+    if (!requestedPhoneNumber || !role) {
       return res.status(400).json({ success: false, message: "फोन नंबर और भूमिका आवश्यक हैं" });
     }
     if (!firstName || !lastName || !password || !work_category || !work_experience || !gender) {
       return res.status(400).json({ success: false, message: "सभी फ़ील्ड (नाम, उपनाम, पासवर्ड, कार्य श्रेणी, अनुभव, लिंग) आवश्यक हैं" });
     }
-    // 🔥 Check if verified OTP exists
-    const otpVerifiedUser = await User.findOne({ phoneNumber, isPhoneVerified: true });
+    const phoneNumberVariants = getPhoneNumberVariants(requestedPhoneNumber);
+
+    // Firebase uses +91XXXXXXXXXX, but the client may send XXXXXXXXXX.
+    // Match both formats so the verification done in firebaseLogin is found.
+    const otpVerifiedUser = await User.findOne({
+      phoneNumber: { $in: phoneNumberVariants },
+      isPhoneVerified: true,
+    });
     if (!otpVerifiedUser) {
       return res.status(400).json({ success: false, message: "फोन सत्यापित नहीं है" });
     }
+
+    // Continue signup with the exact number stored during Firebase verification.
+    const phoneNumber = otpVerifiedUser.phoneNumber;
     // 🔥 Check if already registered with same role
     const existingSameRole = await User.findOne({ phoneNumber, role });
     if (existingSameRole && existingSameRole.email) {
@@ -231,6 +258,7 @@ const roleBasisSignUp = async (req, res) => {
     }
     // 🔥 Create new user record OR use partially created record
     let user = existingSameRole ? existingSameRole : new User({ phoneNumber, role });
+    user.isPhoneVerified = true;
 
     const hashedPassword = await argon2.hash(password);
     user.firstName = firstName;
