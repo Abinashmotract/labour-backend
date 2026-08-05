@@ -158,27 +158,11 @@ const firebaseLogin = async (req, res) => {
     user.isPhoneVerified = true;
     await user.save();
 
-    const token = jwt.sign(
-      { id: user._id, phoneNumber: user.phoneNumber, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "24h" }
-    );
-    const refreshToken = jwt.sign(
-      { id: user._id },
-      process.env.REFRESH_SECRET,
-      { expiresIn: "30d" }
-    );
-
-    user.refreshToken = refreshToken;
-    await user.save();
-
     return res.status(200).json({
       success: true,
       status: 200,
-      message: "लॉगिन सफल!",
+      message: "फोन नंबर सफलतापूर्वक सत्यापित हो गया!",
       id: user._id,
-      token,
-      refreshToken,
       role: user.role,
       phoneNumber: user.phoneNumber,
     });
