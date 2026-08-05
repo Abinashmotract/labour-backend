@@ -160,9 +160,19 @@ const firebaseLogin = async (req, res) => {
       });
     }
 
+    const phoneNumberVariants = getPhoneNumberVariants(phoneNumber);
     let user = await User.findOne({ firebaseUid: uid });
     if (!user) {
-      user = await User.findOne({ phoneNumber });
+      // Firebase uses +91XXXXXXXXXX, while older/client records may use
+      // the local 10-digit format. Reuse an existing record in either format.
+      const phoneUsers = await User.find({
+        phoneNumber: { $in: phoneNumberVariants },
+      }).sort({ createdAt: 1 });
+      const requestedRole = ["labour", "contractor"].includes(role) ? role : null;
+      user =
+        phoneUsers.find((candidate) => candidate.role === requestedRole) ||
+        phoneUsers.find((candidate) => !candidate.password && !candidate.email) ||
+        phoneUsers[0];
     }
 
     if (!user) {
@@ -170,7 +180,8 @@ const firebaseLogin = async (req, res) => {
       user = new User({ phoneNumber, role: userRole, firebaseUid: uid });
     } else {
       user.firebaseUid = uid;
-      user.phoneNumber = phoneNumber;
+      // Keep the existing phone format so we do not create a duplicate or
+      // violate the compound phoneNumber + role unique index.
     }
 
     user.isPhoneVerified = true;
@@ -231,6 +242,9 @@ const roleBasisSignUp = async (req, res) => {
     if (!requestedPhoneNumber || !role) {
       return res.status(400).json({ success: false, message: "फोन नंबर और भूमिका आवश्यक हैं" });
     }
+    if (!["labour", "contractor"].includes(role)) {
+      return res.status(400).json({ success: false, message: "अमान्य भूमिका निर्दिष्ट" });
+    }
     if (!firstName || !lastName || !password || !work_category || !work_experience || !gender) {
       return res.status(400).json({ success: false, message: "सभी फ़ील्ड (नाम, उपनाम, पासवर्ड, कार्य श्रेणी, अनुभव, लिंग) आवश्यक हैं" });
     }
@@ -238,26 +252,40 @@ const roleBasisSignUp = async (req, res) => {
 
     // Firebase uses +91XXXXXXXXXX, but the client may send XXXXXXXXXX.
     // Match both formats so the verification done in firebaseLogin is found.
-    const otpVerifiedUser = await User.findOne({
+    const verifiedUsers = await User.find({
       phoneNumber: { $in: phoneNumberVariants },
       isPhoneVerified: true,
-    });
-    if (!otpVerifiedUser) {
+    }).sort({ createdAt: 1 });
+
+    // Prefer the requested role. If Firebase created a placeholder with a
+    // different role, reuse that incomplete placeholder instead of creating
+    // a second account for the same phone number.
+    const existingSameRole = verifiedUsers.find((candidate) => candidate.role === role);
+    const incompleteVerifiedUser = verifiedUsers.find(
+      (candidate) => !candidate.password && !candidate.email
+    );
+    const otpVerifiedUser = existingSameRole || incompleteVerifiedUser;
+
+    if (!otpVerifiedUser && verifiedUsers.length === 0) {
       return res.status(400).json({ success: false, message: "फोन सत्यापित नहीं है" });
     }
 
     // Continue signup with the exact number stored during Firebase verification.
-    const phoneNumber = otpVerifiedUser.phoneNumber;
-    // 🔥 Check if already registered with same role
-    const existingSameRole = await User.findOne({ phoneNumber, role });
-    if (existingSameRole && existingSameRole.email) {
+    const phoneNumber = otpVerifiedUser ? otpVerifiedUser.phoneNumber : requestedPhoneNumber;
+    const completeSameRole = verifiedUsers.find(
+      (candidate) => candidate.role === role && (candidate.email || candidate.password)
+    );
+    if (completeSameRole) {
       return res.status(400).json({
         success: false,
         message: `${role} इस फोन नंबर के साथ पहले से पंजीकृत है`
       });
     }
-    // 🔥 Create new user record OR use partially created record
-    let user = existingSameRole ? existingSameRole : new User({ phoneNumber, role });
+
+    // Reuse the Firebase placeholder when possible. This is important when
+    // firebaseLogin and signup receive different phone formats or roles.
+    let user = otpVerifiedUser || new User({ phoneNumber, role });
+    user.role = role;
     user.isPhoneVerified = true;
 
     const hashedPassword = await argon2.hash(password);
@@ -344,7 +372,15 @@ const login = async (req, res, next) => {
         message: "अमान्य भूमिका निर्दिष्ट! मजदूर या ठेकेदार होना चाहिए"
       });
     }
-    const account = await User.findOne({ phoneNumber, role });
+    const phoneNumberVariants = getPhoneNumberVariants(phoneNumber);
+    const matchingAccounts = await User.find({
+      phoneNumber: { $in: phoneNumberVariants },
+      role,
+    }).sort({ createdAt: 1 });
+    // If old duplicate records already exist, prefer the completed account
+    // with a password so login does not select Firebase's placeholder.
+    const account =
+      matchingAccounts.find((candidate) => candidate.password) || matchingAccounts[0];
     if (!account) {
       return res.status(404).json({
         success: false,
